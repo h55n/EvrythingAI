@@ -1,0 +1,29 @@
+name: EvrythingAI Monthly Wrap
+
+on:
+  schedule:
+    - cron: '0 18 28-31 * *'  # Runs on 28th-31st at 18:00 UTC — index.js guards for actual last day
+  workflow_dispatch:            # Manual trigger anytime
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run monthly wrap pipeline
+        run: node index.js --monthly
+        env:
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          FROM_EMAIL: ${{ secrets.FROM_EMAIL }}

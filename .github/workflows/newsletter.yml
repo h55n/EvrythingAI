@@ -1,0 +1,29 @@
+name: EvrythingAI Daily Newsletter
+
+on:
+  schedule:
+    - cron: '0 * * * *'    # Every hour — timezone filtering picks who gets mail
+  workflow_dispatch:         # Manual trigger from GitHub UI anytime
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run EvrythingAI pipeline
+        run: node index.js
+        env:
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          FROM_EMAIL: ${{ secrets.FROM_EMAIL }}

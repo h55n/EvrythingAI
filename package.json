@@ -1,0 +1,20 @@
+{
+  "name": "evrythingai",
+  "version": "1.0.0",
+  "description": "Automated daily AI & tech newsletter — news, tools, funding, and a sharp investor/builder signal. Delivered to your inbox every morning via Mistral + Resend.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js --force",
+    "send": "node index.js --force"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@mistralai/mistralai": "^2.1.2",
+    "dotenv": "^17.4.0",
+    "resend": "^6.10.0",
+    "rss-parser": "^3.13.0"
+  },
+  "type": "module"
+}
