@@ -1,15 +1,17 @@
 // email.js — HTML email templates (table-based, inline CSS)
-// HAITI PALETTE:
-//   Background:     #18102B  (Haiti — dark purple-black)
-//   Card fills:     #1E1530  (slightly lighter Haiti)
-//   Primary accent: #834DFB  (Electric Violet — section labels, borders)
-//   Highlight:      #F0E100  (Turbo yellow — amounts, badges)
-//   Soft surface:   #F5F3FF  (Blue Chalk — tool card bg)
-//   Body text:      #F0EAF8  (light lavender-white)
-//   Muted text:     #9B8AB0  (dimmed sources, footer)
-//   Signal bg:      #834DFB  (Electric Violet)
-//   Signal text:    #FFFFFF
-// Fonts: Bebas Neue (headers), DM Mono (labels), DM Sans (body)
+// DESIGN:
+//   Outer background: #18102B  (Haiti — the ONLY Haiti color used)
+//   Header bg:        #111111  (black)
+//   Header accent:    #D6F74C  (Chartreuse — "AI" text, accent line, badges)
+//   Card bg:          #FFFFFF  (white — news, tools, funding cards)
+//   Card border:      #111111  (black — Tool Drop card border)
+//   Body text:        #111111  (black — headlines, card content)
+//   Muted text:       #888888  (grey — sources, footer, date)
+//   Funding amounts:  #F06038  (Tomato — fund amounts/stage)
+//   Signal bg:        #111111  (black)
+//   Signal label:     #F06038  (Tomato)
+//   Signal text:      #FFFFFF  (white)
+// Fonts: Bebas Neue (headers), DM Mono (labels/mono), DM Sans (body)
 
 // ── Shared helpers ──────────────────────────────────────────────
 const FONTS_LINK = '<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">';
@@ -20,8 +22,8 @@ function sectionLabel(text) {
             <td style="padding:0 28px;">
               <table role="presentation" cellpadding="0" cellspacing="0">
                 <tr>
-                  <td style="background-color:#834DFB;padding:5px 14px;border-radius:3px;">
-                    <span style="font-family:'DM Mono','Courier New',monospace;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#FFFFFF;">▸ ${text}</span>
+                  <td style="background-color:#D6F74C;padding:5px 14px;border-radius:3px;">
+                    <span style="font-family:'DM Mono','Courier New',monospace;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#111111;">▸ ${text}</span>
                   </td>
                 </tr>
               </table>
@@ -36,21 +38,21 @@ function spacer(px = 28) {
 function headerBlock(title, subtitle, date) {
   return `
           <tr>
-            <td style="padding:24px 28px;background-color:#18102B;">
+            <td style="padding:24px 28px;background-color:#111111;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td>
-                    <span style="font-family:'Bebas Neue','Arial Black',Impact,sans-serif;font-size:28px;font-weight:700;letter-spacing:2px;color:#F0EAF8;">EVRYTHING</span><span style="font-family:'Bebas Neue','Arial Black',Impact,sans-serif;font-size:28px;font-weight:700;letter-spacing:2px;color:#834DFB;">AI</span>
-                    ${subtitle ? `<span style="font-family:'DM Mono','Courier New',monospace;font-size:10px;color:#834DFB;letter-spacing:2px;text-transform:uppercase;display:block;margin-top:4px;">${subtitle}</span>` : ""}
+                    <span style="font-family:'Bebas Neue','Arial Black',Impact,sans-serif;font-size:28px;font-weight:700;letter-spacing:2px;color:#FFFFFF;">EVRYTHING</span><span style="font-family:'Bebas Neue','Arial Black',Impact,sans-serif;font-size:28px;font-weight:700;letter-spacing:2px;color:#D6F74C;">AI</span>
+                    ${subtitle ? `<span style="font-family:'DM Mono','Courier New',monospace;font-size:10px;color:#D6F74C;letter-spacing:2px;text-transform:uppercase;display:block;margin-top:4px;">${subtitle}</span>` : ""}
                   </td>
                   <td align="right" style="vertical-align:middle;">
-                    <span style="font-family:'DM Mono','Courier New',monospace;font-size:10px;color:#9B8AB0;letter-spacing:2px;text-transform:uppercase;">${date}</span>
+                    <span style="font-family:'DM Mono','Courier New',monospace;font-size:10px;color:#888888;letter-spacing:2px;text-transform:uppercase;">${date}</span>
                   </td>
                 </tr>
               </table>
             </td>
           </tr>
-          <tr><td style="height:4px;background-color:#834DFB;"></td></tr>`;
+          <tr><td style="height:4px;background-color:#D6F74C;"></td></tr>`;
 }
 
 function footerBlock(date) {
@@ -59,8 +61,8 @@ function footerBlock(date) {
             <td style="padding:32px 28px 16px 28px;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
-                  <td style="border-top:1px solid rgba(131,77,251,0.25);padding-top:18px;">
-                    <p style="font-family:'DM Mono','Courier New',monospace;font-size:9px;color:#9B8AB0;text-align:center;letter-spacing:2px;margin:0;text-transform:uppercase;">EvrythingAI &nbsp;·&nbsp; Built by Hssn &nbsp;·&nbsp; AI-generated daily brief &nbsp;·&nbsp; ${date}</p>
+                  <td style="border-top:1px solid rgba(255,255,255,0.15);padding-top:18px;">
+                    <p style="font-family:'DM Mono','Courier New',monospace;font-size:9px;color:#888888;text-align:center;letter-spacing:2px;margin:0;text-transform:uppercase;">EvrythingAI &nbsp;·&nbsp; Built by Hssn &nbsp;·&nbsp; AI-generated daily brief &nbsp;·&nbsp; ${date}</p>
                   </td>
                 </tr>
               </table>
@@ -73,19 +75,19 @@ function footerBlock(date) {
 export function buildEmailHTML({ news, tools, funding, signal, date }) {
   const newsHTML = (news?.items || []).map((item, i) => `
     <tr>
-      <td style="padding:0 0 18px 0;${i < (news.items.length - 1) ? "border-bottom:1px solid rgba(131,77,251,0.15);" : ""}">
+      <td style="padding:0 0 18px 0;${i < (news.items.length - 1) ? "border-bottom:1px solid #E8E8E8;" : ""}">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
           <tr>
             <td>
-              <a href="${item.url || "#"}" style="font-family:'Bebas Neue','Arial Black',Impact,sans-serif;font-size:18px;font-weight:700;color:#F0EAF8;text-decoration:none;display:block;margin-bottom:6px;line-height:1.3;letter-spacing:0.5px;">${item.headline || ""}</a>
-              <p style="font-family:'DM Sans','Segoe UI',Roboto,sans-serif;font-size:13px;color:#F0EAF8;line-height:1.7;margin:0 0 8px 0;opacity:0.8;">${item.summary || ""}</p>
+              <a href="${item.url || "#"}" style="font-family:'Bebas Neue','Arial Black',Impact,sans-serif;font-size:18px;font-weight:700;color:#111111;text-decoration:none;display:block;margin-bottom:6px;line-height:1.3;letter-spacing:0.5px;">${item.headline || ""}</a>
+              <p style="font-family:'DM Sans','Segoe UI',Roboto,sans-serif;font-size:13px;color:#333333;line-height:1.7;margin:0 0 8px 0;">${item.summary || ""}</p>
               <table role="presentation" cellpadding="0" cellspacing="0">
                 <tr>
-                  <td style="background-color:#834DFB;padding:3px 10px;border-radius:2px;">
-                    <span style="font-family:'DM Mono','Courier New',monospace;font-size:9px;font-weight:700;color:#FFFFFF;letter-spacing:2px;text-transform:uppercase;">${item.source || ""}</span>
+                  <td style="background-color:#D6F74C;padding:3px 10px;border-radius:2px;">
+                    <span style="font-family:'DM Mono','Courier New',monospace;font-size:9px;font-weight:700;color:#111111;letter-spacing:2px;text-transform:uppercase;">${item.source || ""}</span>
                   </td>
                   <td style="padding-left:10px;">
-                    <a href="${item.url || "#"}" style="font-family:'DM Mono','Courier New',monospace;font-size:10px;color:#834DFB;text-decoration:none;">Read →</a>
+                    <a href="${item.url || "#"}" style="font-family:'DM Mono','Courier New',monospace;font-size:10px;color:#888888;text-decoration:none;">Read →</a>
                   </td>
                 </tr>
               </table>
@@ -100,14 +102,19 @@ export function buildEmailHTML({ news, tools, funding, signal, date }) {
   const toolsHTML = toolsItems.map((item, i) => `
     <tr>
       <td style="padding:0 0 ${i < toolsItems.length - 1 ? '14' : '0'}px 0;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:2px solid #834DFB;background:#F5F3FF;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:2px solid #111111;background:#FFFFFF;">
           <tr>
             <td style="padding:16px 20px;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                <tr><td><span style="font-family:'Bebas Neue','Arial Black',Impact,sans-serif;font-size:18px;font-weight:700;color:#18102B;letter-spacing:0.5px;">${item.name || "—"}</span></td></tr>
-                <tr><td style="padding-top:4px;"><span style="font-family:'DM Sans','Segoe UI',Roboto,sans-serif;font-size:13px;color:#18102B;line-height:1.6;opacity:0.85;">${item.description || ""}</span></td></tr>
-                <tr><td style="padding-top:4px;"><span style="font-family:'DM Sans','Segoe UI',Roboto,sans-serif;font-size:12px;color:#9B8AB0;font-style:italic;line-height:1.5;">Use case: ${item.useCase || ""}</span></td></tr>
-                <tr><td style="padding-top:10px;">${item.url ? `<a href="${item.url}" style="font-family:'DM Mono','Courier New',monospace;font-size:11px;color:#834DFB;text-decoration:none;font-weight:500;">Try it →</a>` : ""}</td></tr>
+                <tr>
+                  <td>
+                    <span style="font-family:'Bebas Neue','Arial Black',Impact,sans-serif;font-size:18px;font-weight:700;color:#111111;letter-spacing:0.5px;">${item.name || "—"}</span>
+                    ${item.category ? `<span style="font-family:'DM Mono','Courier New',monospace;font-size:9px;font-weight:700;color:#111111;letter-spacing:2px;text-transform:uppercase;background:#D6F74C;padding:2px 8px;margin-left:10px;display:inline-block;border-radius:2px;">${item.category}</span>` : ""}
+                  </td>
+                </tr>
+                <tr><td style="padding-top:4px;"><span style="font-family:'DM Sans','Segoe UI',Roboto,sans-serif;font-size:13px;color:#333333;line-height:1.6;">${item.description || ""}</span></td></tr>
+                <tr><td style="padding-top:4px;"><span style="font-family:'DM Sans','Segoe UI',Roboto,sans-serif;font-size:12px;color:#888888;font-style:italic;line-height:1.5;">Use case: ${item.useCase || ""}</span></td></tr>
+                <tr><td style="padding-top:10px;">${item.url ? `<a href="${item.url}" style="font-family:'DM Mono','Courier New',monospace;font-size:11px;color:#111111;text-decoration:none;font-weight:500;">Try it →</a>` : ""}</td></tr>
               </table>
             </td>
           </tr>
@@ -117,16 +124,16 @@ export function buildEmailHTML({ news, tools, funding, signal, date }) {
 
   const fundingHTML = (funding?.items || []).map((item, i) => `
     <tr>
-      <td style="padding:0 0 14px 0;${i < (funding.items.length - 1) ? "border-bottom:1px solid rgba(131,77,251,0.15);" : ""}">
+      <td style="padding:0 0 14px 0;${i < (funding.items.length - 1) ? "border-bottom:1px solid #E8E8E8;" : ""}">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
           <tr>
             <td>
-              <span style="font-family:'Bebas Neue','Arial Black',Impact,sans-serif;font-size:16px;font-weight:700;color:#F0EAF8;letter-spacing:0.3px;">${item.company || ""}</span>
-              ${item.amount ? `<span style="font-family:'DM Mono','Courier New',monospace;font-size:12px;color:#18102B;font-weight:700;background:#F0E100;padding:2px 8px;margin-left:10px;display:inline-block;border-radius:2px;">${item.amount}${item.stage ? ` · ${item.stage}` : ""}</span>` : ""}
+              <span style="font-family:'Bebas Neue','Arial Black',Impact,sans-serif;font-size:16px;font-weight:700;color:#111111;letter-spacing:0.3px;">${item.company || ""}</span>
+              ${item.amount ? `<span style="font-family:'DM Mono','Courier New',monospace;font-size:12px;color:#F06038;font-weight:700;margin-left:10px;display:inline-block;">${item.amount}${item.stage ? ` · ${item.stage}` : ""}</span>` : ""}
             </td>
           </tr>
-          <tr><td style="padding-top:4px;"><span style="font-family:'DM Sans','Segoe UI',Roboto,sans-serif;font-size:12px;color:#F0EAF8;line-height:1.6;opacity:0.75;">${item.description || ""}</span></td></tr>
-          ${item.investors ? `<tr><td style="padding-top:3px;"><span style="font-family:'DM Mono','Courier New',monospace;font-size:10px;color:#9B8AB0;letter-spacing:0.5px;">Lead: ${item.investors}</span></td></tr>` : ""}
+          <tr><td style="padding-top:4px;"><span style="font-family:'DM Sans','Segoe UI',Roboto,sans-serif;font-size:12px;color:#555555;line-height:1.6;">${item.description || ""}</span></td></tr>
+          ${item.investors ? `<tr><td style="padding-top:3px;"><span style="font-family:'DM Mono','Courier New',monospace;font-size:10px;color:#888888;letter-spacing:0.5px;">Lead: ${item.investors}</span></td></tr>` : ""}
         </table>
       </td>
     </tr>
@@ -159,7 +166,7 @@ export function buildEmailHTML({ news, tools, funding, signal, date }) {
   <!--[if mso]><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml><![endif]-->
   ${FONTS_LINK}
 </head>
-<body style="margin:0;padding:0;background-color:#18102B;font-family:'DM Sans','Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#F0EAF8;">
+<body style="margin:0;padding:0;background-color:#18102B;font-family:'DM Sans','Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#111111;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#18102B;">
     <tr>
       <td align="center" style="padding:32px 16px;">
@@ -171,7 +178,7 @@ export function buildEmailHTML({ news, tools, funding, signal, date }) {
 
           <tr>
             <td style="padding:16px 28px 0 28px;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#1E1530;padding:20px 24px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#FFFFFF;padding:20px 24px;">
                 ${newsHTML}
               </table>
             </td>
@@ -193,8 +200,8 @@ export function buildEmailHTML({ news, tools, funding, signal, date }) {
 
           <tr>
             <td style="padding:16px 28px 0 28px;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#1E1530;padding:20px 24px;">
-                ${funding?.items?.length > 0 ? fundingHTML : '<tr><td><span style="font-family:\'DM Sans\',\'Segoe UI\',Roboto,sans-serif;font-size:13px;color:#9B8AB0;font-style:italic;">No significant funding news found today.</span></td></tr>'}
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#FFFFFF;padding:20px 24px;">
+                ${funding?.items?.length > 0 ? fundingHTML : '<tr><td><span style="font-family:\'DM Sans\',\'Segoe UI\',Roboto,sans-serif;font-size:13px;color:#888888;font-style:italic;">No significant funding news found today.</span></td></tr>'}
               </table>
             </td>
           </tr>
@@ -204,11 +211,11 @@ export function buildEmailHTML({ news, tools, funding, signal, date }) {
 
           <tr>
             <td style="padding:16px 28px 0 28px;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#834DFB;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#111111;">
                 <tr>
                   <td style="padding:24px 26px;">
                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                      <tr><td><span style="font-family:'DM Mono','Courier New',monospace;font-size:9px;color:rgba(255,255,255,0.6);letter-spacing:3px;text-transform:uppercase;">◈ TODAY'S PATTERN</span></td></tr>
+                      <tr><td><span style="font-family:'DM Mono','Courier New',monospace;font-size:9px;color:#F06038;letter-spacing:3px;text-transform:uppercase;">◈ TODAY'S PATTERN</span></td></tr>
                       <tr>
                         <td style="padding-top:14px;">
                           <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
@@ -278,15 +285,15 @@ export function buildEmailText({ news, tools, funding, signal, date }) {
 export function buildMonthlyHTML({ wrap, monthLabel, date }) {
   const topFundedHTML = (wrap?.topFunded || []).map((item, i) => `
     <tr>
-      <td style="padding:0 0 14px 0;${i < (wrap.topFunded.length - 1) ? "border-bottom:1px solid rgba(131,77,251,0.15);" : ""}">
+      <td style="padding:0 0 14px 0;${i < (wrap.topFunded.length - 1) ? "border-bottom:1px solid #E8E8E8;" : ""}">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
           <tr>
             <td>
-              <span style="font-family:'Bebas Neue','Arial Black',Impact,sans-serif;font-size:16px;font-weight:700;color:#F0EAF8;letter-spacing:0.3px;">${item.company || ""}</span>
-              ${item.amount ? `<span style="font-family:'DM Mono','Courier New',monospace;font-size:12px;color:#18102B;font-weight:700;background:#F0E100;padding:2px 8px;margin-left:10px;display:inline-block;border-radius:2px;">${item.amount}</span>` : ""}
+              <span style="font-family:'Bebas Neue','Arial Black',Impact,sans-serif;font-size:16px;font-weight:700;color:#111111;letter-spacing:0.3px;">${item.company || ""}</span>
+              ${item.amount ? `<span style="font-family:'DM Mono','Courier New',monospace;font-size:12px;color:#F06038;font-weight:700;margin-left:10px;display:inline-block;">${item.amount}</span>` : ""}
             </td>
           </tr>
-          <tr><td style="padding-top:4px;"><span style="font-family:'DM Sans','Segoe UI',Roboto,sans-serif;font-size:12px;color:#F0EAF8;line-height:1.6;opacity:0.75;">${item.description || ""}</span></td></tr>
+          <tr><td style="padding-top:4px;"><span style="font-family:'DM Sans','Segoe UI',Roboto,sans-serif;font-size:12px;color:#555555;line-height:1.6;">${item.description || ""}</span></td></tr>
         </table>
       </td>
     </tr>
@@ -295,13 +302,18 @@ export function buildMonthlyHTML({ wrap, monthLabel, date }) {
   const breakoutHTML = (wrap?.breakoutTools || []).map((item, i) => `
     <tr>
       <td style="padding:0 0 ${i < (wrap.breakoutTools.length - 1) ? '14' : '0'}px 0;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:2px solid #834DFB;background:#F5F3FF;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:2px solid #111111;background:#FFFFFF;">
           <tr>
             <td style="padding:16px 20px;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                <tr><td><span style="font-family:'Bebas Neue','Arial Black',Impact,sans-serif;font-size:18px;font-weight:700;color:#18102B;letter-spacing:0.5px;">${item.name || "—"}</span></td></tr>
-                <tr><td style="padding-top:4px;"><span style="font-family:'DM Sans','Segoe UI',Roboto,sans-serif;font-size:13px;color:#18102B;line-height:1.6;opacity:0.85;">${item.description || ""}</span></td></tr>
-                <tr><td style="padding-top:4px;"><span style="font-family:'DM Sans','Segoe UI',Roboto,sans-serif;font-size:12px;color:#834DFB;font-style:italic;line-height:1.5;">Why: ${item.why || ""}</span></td></tr>
+                <tr>
+                  <td>
+                    <span style="font-family:'Bebas Neue','Arial Black',Impact,sans-serif;font-size:18px;font-weight:700;color:#111111;letter-spacing:0.5px;">${item.name || "—"}</span>
+                    ${item.category ? `<span style="font-family:'DM Mono','Courier New',monospace;font-size:9px;font-weight:700;color:#111111;letter-spacing:2px;text-transform:uppercase;background:#D6F74C;padding:2px 8px;margin-left:10px;display:inline-block;border-radius:2px;">${item.category}</span>` : ""}
+                  </td>
+                </tr>
+                <tr><td style="padding-top:4px;"><span style="font-family:'DM Sans','Segoe UI',Roboto,sans-serif;font-size:13px;color:#333333;line-height:1.6;">${item.description || ""}</span></td></tr>
+                <tr><td style="padding-top:4px;"><span style="font-family:'DM Sans','Segoe UI',Roboto,sans-serif;font-size:12px;color:#888888;font-style:italic;line-height:1.5;">Why: ${item.why || ""}</span></td></tr>
               </table>
             </td>
           </tr>
@@ -333,11 +345,11 @@ export function buildMonthlyHTML({ wrap, monthLabel, date }) {
   <!--[if mso]><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml><![endif]-->
   ${FONTS_LINK}
 </head>
-<body style="margin:0;padding:0;background-color:#18102B;font-family:'DM Sans','Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#F0EAF8;">
+<body style="margin:0;padding:0;background-color:#18102B;font-family:'DM Sans','Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#111111;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#18102B;">
     <tr>
       <td align="center" style="padding:32px 16px;">
-        <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
 
           ${headerBlock("", "MONTHLY WRAP", monthLabel)}
           ${spacer()}
@@ -346,9 +358,9 @@ export function buildMonthlyHTML({ wrap, monthLabel, date }) {
           ${sectionLabel("MONTH IN REVIEW")}
           <tr>
             <td style="padding:16px 28px 0 28px;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#1E1530;padding:20px 24px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#FFFFFF;padding:20px 24px;">
                 <tr><td>
-                  <p style="font-family:'DM Sans','Segoe UI',Roboto,sans-serif;font-size:14px;color:#F0EAF8;line-height:1.8;margin:0;">${wrap?.review || ""}</p>
+                  <p style="font-family:'DM Sans','Segoe UI',Roboto,sans-serif;font-size:14px;color:#333333;line-height:1.8;margin:0;">${wrap?.review || ""}</p>
                 </td></tr>
               </table>
             </td>
@@ -360,8 +372,8 @@ export function buildMonthlyHTML({ wrap, monthLabel, date }) {
           ${sectionLabel("TOP FUNDED COMPANIES")}
           <tr>
             <td style="padding:16px 28px 0 28px;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#1E1530;padding:20px 24px;">
-                ${topFundedHTML || '<tr><td><span style="font-family:\'DM Sans\',sans-serif;font-size:13px;color:#9B8AB0;font-style:italic;">No data available.</span></td></tr>'}
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#FFFFFF;padding:20px 24px;">
+                ${topFundedHTML || '<tr><td><span style="font-family:\'DM Sans\',sans-serif;font-size:13px;color:#888888;font-style:italic;">No data available.</span></td></tr>'}
               </table>
             </td>
           </tr>
@@ -384,10 +396,10 @@ export function buildMonthlyHTML({ wrap, monthLabel, date }) {
           ${sectionLabel("WHAT'S COMING")}
           <tr>
             <td style="padding:16px 28px 0 28px;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#1E1530;border-left:3px solid #834DFB;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#FFFFFF;border-left:3px solid #D6F74C;">
                 <tr>
                   <td style="padding:22px 24px;">
-                    <p style="font-family:'DM Sans','Segoe UI',Roboto,sans-serif;font-size:14px;color:#F0EAF8;line-height:1.8;margin:0;">${wrap?.whatsNext || ""}</p>
+                    <p style="font-family:'DM Sans','Segoe UI',Roboto,sans-serif;font-size:14px;color:#333333;line-height:1.8;margin:0;">${wrap?.whatsNext || ""}</p>
                   </td>
                 </tr>
               </table>
@@ -400,11 +412,11 @@ export function buildMonthlyHTML({ wrap, monthLabel, date }) {
           ${sectionLabel("MONTHLY SIGNAL")}
           <tr>
             <td style="padding:16px 28px 0 28px;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#834DFB;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#111111;">
                 <tr>
                   <td style="padding:24px 26px;">
                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                      <tr><td><span style="font-family:'DM Mono','Courier New',monospace;font-size:9px;color:rgba(255,255,255,0.6);letter-spacing:3px;text-transform:uppercase;">◈ FORWARD SIGNAL — NEXT MONTH</span></td></tr>
+                      <tr><td><span style="font-family:'DM Mono','Courier New',monospace;font-size:9px;color:#F06038;letter-spacing:3px;text-transform:uppercase;">◈ FORWARD SIGNAL — NEXT MONTH</span></td></tr>
                       <tr>
                         <td style="padding-top:14px;">
                           <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
