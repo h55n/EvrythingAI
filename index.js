@@ -223,7 +223,8 @@ async function runDaily(resend, subscribers) {
 // ── Monthly wrap pipeline ───────────────────────────────────────
 async function runMonthly(resend, subscribers) {
   // Guard: only run on the actual last day of the month
-  const forceMonthly = process.argv.includes("--force");
+  // Can be bypassed with --force flag or FORCE_MONTHLY=true env var
+  const forceMonthly = process.argv.includes("--force") || process.env.FORCE_MONTHLY === "true";
   if (!isLastDayOfMonth() && !forceMonthly) {
     console.log("📅  Not the last day of the month. Exiting cleanly.\n");
     process.exit(0);

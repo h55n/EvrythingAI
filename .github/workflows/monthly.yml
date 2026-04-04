@@ -3,7 +3,13 @@ name: EvrythingAI Monthly Wrap
 on:
   schedule:
     - cron: '0 18 28-31 * *'  # Runs on 28th-31st at 18:00 UTC — index.js guards for actual last day
-  workflow_dispatch:            # Manual trigger anytime
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force send even if not last day of month (true/false)'
+        required: false
+        default: 'false'
+        type: string
 
 jobs:
   send:
@@ -27,3 +33,4 @@ jobs:
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
+          FORCE_MONTHLY: ${{ github.event.inputs.force }}
