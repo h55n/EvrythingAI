@@ -7,14 +7,30 @@ function getClient() {
   return client;
 }
 
+const MAX_RETRIES = 3;
+const RETRY_BASE_MS = 2000;
+
 async function chat(prompt, model = "mistral-large-latest", maxTokens = 1500) {
-  const res = await getClient().chat.complete({
-    model,
-    messages: [{ role: "user", content: prompt }],
-    temperature: 0.4,
-    maxTokens,
-  });
-  return res.choices[0].message.content.trim();
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const res = await getClient().chat.complete({
+        model,
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.4,
+        maxTokens,
+      });
+      return res.choices[0].message.content.trim();
+    } catch (err) {
+      const isRetryable = err.status === 429 || err.code === "ECONNRESET" || err.code === "ETIMEDOUT" || err.message?.includes("fetch failed");
+      if (isRetryable && attempt < MAX_RETRIES) {
+        const delay = RETRY_BASE_MS * Math.pow(2, attempt - 1);
+        console.warn(`  [retry] Attempt ${attempt}/${MAX_RETRIES} failed (${err.message}), retrying in ${delay}ms...`);
+        await new Promise(r => setTimeout(r, delay));
+      } else {
+        throw err;
+      }
+    }
+  }
 }
 
 function safeJSON(raw, fallback) {

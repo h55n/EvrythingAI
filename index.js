@@ -1,10 +1,19 @@
 // index.js — EvrythingAI main pipeline
 import "dotenv/config";
-import { readFileSync } from "fs";
+import { readFileSync, appendFileSync } from "fs";
 import { Resend } from "resend";
 import { collectNews, collectFunding, collectTools } from "./sources.js";
 import { pickTopNews, pickToolDrop, pickFunding, generateSignal, generateMonthlyWrap } from "./ai.js";
 import { buildEmailHTML, buildEmailText, buildMonthlyHTML, buildMonthlyText } from "./email.js";
+
+// ── Pipeline monitor (local only — gitignored) ─────────────────
+const MONITOR_FILE = new URL("./pipeline_monitor.json", import.meta.url);
+function logMonitor(entry) {
+  try {
+    const line = JSON.stringify({ timestamp: new Date().toISOString(), ...entry }) + "\n";
+    appendFileSync(MONITOR_FILE, line, "utf-8");
+  } catch { /* monitor logging is best-effort */ }
+}
 
 const DEFAULT_TIMEZONE = "Asia/Kolkata";
 const DELIVERY_HOUR = 6; // 6:00am local time
@@ -197,7 +206,9 @@ async function runDaily(resend, subscribers) {
   const text = buildEmailText(payload);
   const subject = `EvrythingAI — ${date}`;
 
-  const { successCount } = await sendToSubscribers(resend, subscribers, subject, html, text);
+  const { successCount, failCount } = await sendToSubscribers(resend, subscribers, subject, html, text);
+
+  logMonitor({ mode: "daily", status: successCount > 0 ? "success" : "failure", subscribers: subscribers.length, sent: successCount, failed: failCount, feedCounts: { news: rawNews.length, funding: rawFunding.length, tools: rawTools.length } });
 
   if (successCount === 0) {
     console.log("\n💡  Common fixes:");
@@ -254,7 +265,9 @@ async function runMonthly(resend, subscribers) {
   const text = buildMonthlyText(payload);
   const subject = `EvrythingAI — ${monthLabel} Monthly Wrap`;
 
-  const { successCount } = await sendToSubscribers(resend, subscribers, subject, html, text);
+  const { successCount, failCount } = await sendToSubscribers(resend, subscribers, subject, html, text);
+
+  logMonitor({ mode: "monthly", status: successCount > 0 ? "success" : "failure", subscribers: subscribers.length, sent: successCount, failed: failCount, feedCounts: { news: rawNews.length, funding: rawFunding.length, tools: rawTools.length } });
 
   if (successCount === 0) {
     console.log("\n💡  No emails sent. Check Resend configuration.");
@@ -327,5 +340,6 @@ async function run() {
 run().catch(err => {
   console.error("\n💥  Fatal error:", err.message);
   if (err.stack) console.error(err.stack);
+  logMonitor({ mode: "unknown", status: "crash", error: err.message });
   process.exit(1);
 });

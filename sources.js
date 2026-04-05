@@ -62,11 +62,25 @@ export async function collectNews() {
 export async function collectFunding() {
   console.log("  Fetching funding feeds...");
   const results = await Promise.allSettled(FUNDING_FEEDS.map(fetchFeed));
-  return results.flatMap(r => r.status === "fulfilled" ? r.value : []);
+  const items = results.flatMap(r => r.status === "fulfilled" ? r.value : []);
+  // dedupe by URL
+  const seen = new Set();
+  return items.filter(i => {
+    if (!i.url || seen.has(i.url)) return false;
+    seen.add(i.url);
+    return true;
+  });
 }
 
 export async function collectTools() {
   console.log("  Fetching tool feeds...");
   const results = await Promise.allSettled(TOOL_FEEDS.map(fetchFeed));
-  return results.flatMap(r => r.status === "fulfilled" ? r.value : []);
+  const items = results.flatMap(r => r.status === "fulfilled" ? r.value : []);
+  // dedupe by URL
+  const seen = new Set();
+  return items.filter(i => {
+    if (!i.url || seen.has(i.url)) return false;
+    seen.add(i.url);
+    return true;
+  });
 }

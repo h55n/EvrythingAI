@@ -2,7 +2,7 @@ name: EvrythingAI Daily Newsletter
 
 on:
   schedule:
-    - cron: '0 * * * *'    # Every hour — timezone filtering picks who gets mail
+    - cron: '30 0 * * *'    # 00:30 UTC = 6:00 AM IST daily
   workflow_dispatch:         # Manual trigger from GitHub UI anytime
 
 jobs:
@@ -22,7 +22,7 @@ jobs:
         run: npm install
 
       - name: Run EvrythingAI pipeline
-        run: node index.js
+        run: node index.js --force
         env:
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
