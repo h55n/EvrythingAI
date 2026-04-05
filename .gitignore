@@ -4,3 +4,4 @@ node_modules/
 .DS_Store
 pipeline_monitor.json
 test-email.js
+CHANGELOG_LOCAL.md
