@@ -15,8 +15,7 @@ function logMonitor(entry) {
   } catch { /* monitor logging is best-effort */ }
 }
 
-const DEFAULT_TIMEZONE = "Asia/Kolkata";
-const DELIVERY_HOUR = 6; // 6:00am local time
+
 
 // ── Top-level error boundary ────────────────────────────────────
 process.on("uncaughtException", (err) => {
@@ -41,24 +40,7 @@ function validateEnv() {
   }
 }
 
-// ── Timezone helpers ────────────────────────────────────────────
-function getLocalHour(timezone) {
-  try {
-    const fmt = new Intl.DateTimeFormat("en-US", {
-      timeZone: timezone,
-      hour: "numeric",
-      hour12: false,
-    });
-    return parseInt(fmt.format(new Date()), 10);
-  } catch {
-    const fmt = new Intl.DateTimeFormat("en-US", {
-      timeZone: DEFAULT_TIMEZONE,
-      hour: "numeric",
-      hour12: false,
-    });
-    return parseInt(fmt.format(new Date()), 10);
-  }
-}
+
 
 function isLastDayOfMonth() {
   const now = new Date();
@@ -95,7 +77,7 @@ function loadAllSubscribers() {
     // Support old string format
     if (typeof entry === "string") {
       if (entry.includes("@")) {
-        valid.push({ email: entry, timezone: DEFAULT_TIMEZONE });
+        valid.push({ email: entry });
       } else {
         console.warn(`  [skip] subscribers[${i}]: invalid email string "${entry}"`);
       }
@@ -112,32 +94,13 @@ function loadAllSubscribers() {
       return;
     }
 
-    // Validate timezone
-    let tz = entry.timezone || DEFAULT_TIMEZONE;
-    try {
-      new Intl.DateTimeFormat("en-US", { timeZone: tz });
-    } catch {
-      console.warn(`  [skip] subscribers[${i}]: invalid timezone "${tz}", using ${DEFAULT_TIMEZONE}`);
-      tz = DEFAULT_TIMEZONE;
-    }
-
-    valid.push({ email: entry.email, timezone: tz });
+    valid.push({ email: entry.email });
   });
 
   return valid;
 }
 
-function filterByDeliveryHour(subscribers, forceAll = false) {
-  if (forceAll) return subscribers;
-  return subscribers.filter(sub => {
-    const localHour = getLocalHour(sub.timezone);
-    const match = localHour === DELIVERY_HOUR;
-    if (!match) {
-      console.log(`   ⏭  ${sub.email} (${sub.timezone}) — local hour is ${localHour}, skipping`);
-    }
-    return match;
-  });
-}
+
 
 // ── Send emails with per-subscriber error handling ──────────────
 async function sendToSubscribers(resend, subscribers, subject, html, text) {
@@ -300,34 +263,16 @@ async function run() {
   validateEnv();
   const resend = new Resend(process.env.RESEND_API_KEY);
 
-  const forceAll = process.argv.includes("--force");
-  const allSubscribers = loadAllSubscribers();
+  const subscribers = loadAllSubscribers();
 
-  if (allSubscribers.length === 0) {
+  if (subscribers.length === 0) {
     console.error("❌  No valid subscribers found in subscribers.json");
     process.exit(1);
   }
 
-  console.log(`📋  Total subscribers: ${allSubscribers.length}`);
-
-  let subscribers;
-  if (isMonthly) {
-    // Monthly wrap sends to ALL subscribers (no timezone filter)
-    subscribers = allSubscribers;
-    console.log("📬  Monthly wrap: sending to all subscribers\n");
-  } else {
-    console.log(`⏰  Delivery hour: ${DELIVERY_HOUR}:00 local time`);
-    if (forceAll) console.log("🔧  --force flag: sending to ALL subscribers\n");
-    subscribers = filterByDeliveryHour(allSubscribers, forceAll);
-
-    if (subscribers.length === 0) {
-      console.log("\n✅  No subscribers due for delivery this hour. Exiting cleanly.\n");
-      process.exit(0);
-    }
-  }
-
-  console.log(`📬  Sending to ${subscribers.length} subscriber(s):`);
-  subscribers.forEach(s => console.log(`    • ${s.email} (${s.timezone})`));
+  console.log(`📋  Subscribers: ${subscribers.length}`);
+  console.log(`📬  Sending to all subscriber(s):`);
+  subscribers.forEach(s => console.log(`    • ${s.email}`));
   console.log("");
 
   if (isMonthly) {

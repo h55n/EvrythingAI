@@ -2,7 +2,7 @@
 
 Automated daily AI & tech newsletter. Fully cloud-hosted, zero PC dependency, 100% free.
 
-**Pipeline:** RSS feeds → Mistral AI curates + summarizes → Signal generated → HTML email via Resend → your inbox every morning at 6am local time.
+**Pipeline:** RSS feeds → Mistral AI curates + summarizes → Signal generated → HTML email via Resend → your inbox every morning at 6:00 AM IST.
 
 **Sections in every email:**
 - **Top 3 News** — Most important AI/tech stories from the last 24h
@@ -16,7 +16,7 @@ Automated daily AI & tech newsletter. Fully cloud-hosted, zero PC dependency, 10
 
 | Service | Role | Free Tier |
 |---|---|---|
-| GitHub Actions | Runs pipeline hourly (timezone filter) | 2,000 min/month (you use ~60) |
+| GitHub Actions | Runs pipeline once daily at 6:00 AM IST | 2,000 min/month (you use ~5) |
 | Mistral AI | Summarization + Signal generation | Free tier available |
 | Resend | Sends the HTML email | 3,000 emails/month, 100/day |
 
@@ -62,7 +62,7 @@ Once set up, your PC is completely irrelevant. GitHub's servers run the job auto
 cp .env.example .env
 # fill in your keys in .env
 npm install
-npm start           # runs with --force (sends to all subscribers regardless of timezone)
+npm start           # sends to all subscribers
 ```
 
 ---
@@ -103,16 +103,9 @@ Add these 3 secrets:
 
 ### Step 3 — Done
 
-The workflow file at `.github/workflows/newsletter.yml` runs **every hour**.
+The workflow file at `.github/workflows/newsletter.yml` runs **once daily at 12:30 AM UTC (6:00 AM IST)**.
 
-**How timezone delivery works:**
-1. GitHub Actions triggers the pipeline every hour on the hour
-2. `index.js` loads `subscribers.json` and checks each subscriber's local time
-3. Only subscribers whose local time is **6:00am–6:59am** receive the newsletter in that run
-4. All other subscribers are skipped (they'll get theirs when it's 6am in *their* timezone)
-5. If no subscribers are due, the pipeline exits cleanly with no API calls
-
-**Example:** A subscriber in `Asia/Kolkata` (UTC+5:30) gets their email when the cron fires at 00:30 UTC. A subscriber in `America/New_York` (UTC-4) gets theirs when the cron fires at 10:00 UTC.
+Delivers once daily at 6:00 AM IST to all subscribers.
 
 > **Important:** `subscribers.json` must be committed to the repo — GitHub Actions reads it from the checkout.
 
@@ -120,11 +113,9 @@ The workflow file at `.github/workflows/newsletter.yml` runs **every hour**.
 
 GitHub repo → **Actions** tab → **EvrythingAI Daily Newsletter** → **Run workflow** → **Run workflow**
 
-> Manual triggers also respect timezone filtering. Use `node index.js --force` locally to bypass.
-
 ### Check logs / debug
 
-GitHub repo → **Actions** tab → click any run → click the **send** job → see full terminal output including which subscribers were skipped/sent, what news was picked, and the Resend email ID.
+GitHub repo → **Actions** tab → click any run → click the **send** job → see full terminal output including what news was picked and the Resend email ID.
 
 ---
 
@@ -134,12 +125,12 @@ GitHub repo → **Actions** tab → click any run → click the **send** job →
 evrythingai/
 ├── .github/
 │   └── workflows/
-│       └── newsletter.yml   ← GitHub Actions hourly cron
-├── index.js                 ← Main pipeline (timezone-aware)
+│       └── newsletter.yml   ← GitHub Actions daily cron (6am IST)
+├── index.js                 ← Main pipeline
 ├── sources.js               ← RSS feed collectors
 ├── ai.js                    ← Mistral AI summarization + Signal
 ├── email.js                 ← HTML + plaintext email builder
-├── subscribers.json         ← Subscriber list with timezones
+├── subscribers.json         ← Subscriber list (email only)
 ├── addsubscriber.js         ← CLI to add subscribers
 ├── package.json
 ├── .env.example             ← Copy to .env for local testing
@@ -152,10 +143,10 @@ evrythingai/
 ## How the pipeline works
 
 ```
-GitHub Actions cron (every hour)
+GitHub Actions cron (once daily at 6am IST)
          ↓
-index.js — loads subscribers, filters by 6am local time
-         ↓ (if any subscribers are due)
+index.js — loads all subscribers
+         ↓
 RSS feeds (6 news + 2 funding + 2 tool sources)
          ↓
 sources.js — fetches last 48h items, dedupes by URL
@@ -166,7 +157,7 @@ ai.js — Mistral generates 3-bullet Signal from combined pattern
          ↓
 email.js — builds table-based HTML email (works in all clients)
          ↓
-index.js — sends via Resend to eligible subscribers
+index.js — sends via Resend to all subscribers
 ```
 
 ---
@@ -184,53 +175,22 @@ index.js — sends via Resend to eligible subscribers
 
 ## Managing Subscribers
 
-Subscribers are stored in `subscribers.json` — a JSON array of objects with email and timezone.
+Subscribers are stored in `subscribers.json` — a simple JSON array of email objects.
 
 **Add a subscriber via CLI:**
 
 ```bash
-node addsubscriber.js hello@example.com "America/New_York"
-```
-
-Timezone is optional — defaults to `Asia/Kolkata`:
-
-```bash
 node addsubscriber.js hello@example.com
-# → adds with timezone Asia/Kolkata
-```
-
-**Update a subscriber's timezone:**
-
-```bash
-node addsubscriber.js hello@example.com "Europe/London"
-# → updates timezone if email already exists
 ```
 
 **Manually edit subscribers.json:**
 
 ```json
 [
-  { "email": "user1@example.com", "timezone": "Asia/Kolkata" },
-  { "email": "user2@example.com", "timezone": "America/New_York" },
-  { "email": "user3@example.com", "timezone": "Europe/London" }
+  { "email": "user1@example.com" },
+  { "email": "user2@example.com" }
 ]
 ```
-
-### Supported Timezones
-
-| Timezone | UTC Offset | 6am delivery (UTC) |
-|---|---|---|
-| `Asia/Kolkata` | UTC+5:30 | 00:30 UTC |
-| `Asia/Dubai` | UTC+4 | 02:00 UTC |
-| `Asia/Singapore` | UTC+8 | 22:00 UTC |
-| `Australia/Sydney` | UTC+10/+11 | 19:00/20:00 UTC |
-| `Europe/London` | UTC+0/+1 | 05:00/06:00 UTC |
-| `Europe/Paris` | UTC+1/+2 | 04:00/05:00 UTC |
-| `America/New_York` | UTC-5/-4 | 10:00/11:00 UTC |
-| `America/Chicago` | UTC-6/-5 | 11:00/12:00 UTC |
-| `America/Los_Angeles` | UTC-8/-7 | 13:00/14:00 UTC |
-
-> Any valid IANA timezone works (Node.js uses `Intl.DateTimeFormat`). The table above lists recommended ones.
 
 > **Remember:** After adding subscribers, commit and push `subscribers.json` so GitHub Actions can read it.
 
@@ -249,9 +209,6 @@ node addsubscriber.js hello@example.com "Europe/London"
 **Mistral API errors**
 → Verify your MISTRAL_API_KEY secret is correct in GitHub Secrets (no extra spaces).
 
-**Run shows "No subscribers due for delivery"**
-→ Normal! The hourly cron only sends to subscribers whose local time is 6am. Check the logs to see which timezones were evaluated.
-
 **Run shows as skipped**
 → GitHub sometimes skips scheduled Actions on repos with no recent activity. Trigger manually once to reactivate, or push a small commit.
 
@@ -261,7 +218,7 @@ node addsubscriber.js hello@example.com "Europe/London"
 
 1. Verify your own domain at resend.com/domains (free with any domain)
 2. Update `FROM_EMAIL` secret to `EvrythingAI <hello@yourdomain.com>`
-3. Add subscriber emails with timezones to `subscribers.json`
+3. Add subscriber emails to `subscribers.json`
 4. Consider Resend Audiences for large lists (1000+ subscribers)
 
 ---
