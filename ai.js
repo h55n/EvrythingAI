@@ -56,6 +56,24 @@ Return ONLY valid JSON, no markdown, no backticks:
   return safeJSON(raw, { items: rawItems.slice(0,3).map(i => ({ headline: i.title, summary: i.summary, source: i.source, url: i.url })) });
 }
 
+async function pickDailyTool() {
+  console.log("  AI: selecting daily useful tool...");
+  const dayTag = new Date().toISOString().slice(0, 10); // YYYY-MM-DD for variety
+  const prompt = `Today is ${dayTag}. Suggest one genuinely useful tool for AI builders, founders, or investors for daily use. It does not need to be newly launched — just highly practical and underused or worth highlighting today. Pick something different each day.
+Categories: productivity, research, dev tools, APIs, automation, analytics, browser extensions, writing, data.
+Return ONLY valid JSON, no backticks:
+{"name":"Tool name","tagline":"One sentence what it does","category":"category here","url":"https://...","why":"One sentence why builders or investors should use this daily"}`;
+
+  const raw = await chat(prompt, "mistral-large-latest", 500);
+  return safeJSON(raw, {
+    name: "Notion",
+    tagline: "All-in-one workspace for notes, docs, and project management.",
+    category: "productivity",
+    url: "https://notion.so",
+    why: "Centralizes scattered workflows into one searchable, shareable space."
+  });
+}
+
 export async function pickToolDrop(rawItems) {
   console.log(`  AI: selecting top 3 tools/models from ${rawItems.length} items...`);
   const prompt = `You are a sharp AI tools and models curator. Below are recent items from ProductHunt and HN Show. Pick the 3 most interesting NEW AI tools or newly launched LLMs that builders or investors should know about. Prioritize newly launched LLMs and AI-powered tools.
@@ -85,6 +103,25 @@ Return exactly 3 items.`;
       url: rawItems[0]?.url || "#",
     }];
   }
+
+  // Tag existing items as 'new'
+  result.items = result.items.map(item => ({ ...item, type: 'new' }));
+
+  // Fetch and append the daily useful tool as 4th item
+  try {
+    const daily = await pickDailyTool();
+    result.items.push({
+      name: daily.name || "—",
+      description: daily.tagline || "",
+      useCase: daily.why || "",
+      category: daily.category || "",
+      url: daily.url || "#",
+      type: "daily",
+    });
+  } catch (err) {
+    console.warn("  ⚠️  Daily tool pick failed, skipping:", err.message);
+  }
+
   return result;
 }
 
@@ -160,9 +197,11 @@ Generate a monthly wrap with these sections:
 
 3. "breakoutTools" — Array of 3 tools or models that broke out this month (went viral, got massive adoption, or were truly novel). Each: {"name","description","why"}
 
-4. "whatsNext" — 2–3 sentences on what to expect next month based on current trends.
+4. "usefulTools" — Array of 3–5 genuinely useful tools for builders/founders/investors that are worth highlighting from this month. Not necessarily new — just highly practical. Each: {"name","description","category","url","why"}
 
-5. "signal" — Array of exactly 5 forward-looking bullet points for next month:
+5. "whatsNext" — 2–3 sentences on what to expect next month based on current trends.
+
+6. "signal" — Array of exactly 5 forward-looking bullet points for next month:
    - Bullet 1: Where money will move
    - Bullet 2: What founders should build
    - Bullet 3: What technology shift to watch
@@ -172,13 +211,14 @@ Generate a monthly wrap with these sections:
 Be specific. Reference real companies, real products, real trends. No generic statements.
 
 Return ONLY valid JSON, no markdown, no backticks:
-{"review":"...","topFunded":[{"company":"...","amount":"...","description":"..."}],"breakoutTools":[{"name":"...","description":"...","why":"..."}],"whatsNext":"...","signal":["bullet1","bullet2","bullet3","bullet4","bullet5"]}`;
+{"review":"...","topFunded":[{"company":"...","amount":"...","description":"..."}],"breakoutTools":[{"name":"...","description":"...","why":"..."}],"usefulTools":[{"name":"...","description":"...","category":"...","url":"https://...","why":"..."}],"whatsNext":"...","signal":["bullet1","bullet2","bullet3","bullet4","bullet5"]}`;
 
-  const raw = await chat(prompt, "mistral-large-latest", 2500);
+  const raw = await chat(prompt, "mistral-large-latest", 3000);
   return safeJSON(raw, {
     review: `${monthName} was defined by continued infrastructure investment and a wave of specialized AI tooling.`,
     topFunded: [{ company: "—", amount: "—", description: "Data unavailable" }],
     breakoutTools: [{ name: "—", description: "—", why: "Data unavailable" }],
+    usefulTools: [{ name: "—", description: "—", category: "—", url: "#", why: "Data unavailable" }],
     whatsNext: "The current trajectory suggests continued momentum in AI infrastructure and vertical applications.",
     signal: [
       "Infrastructure plays continue attracting the largest rounds.",

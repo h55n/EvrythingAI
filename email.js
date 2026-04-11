@@ -122,9 +122,12 @@ export function buildEmailHTML({ news, tools, funding, signal, date }) {
     ${i < (news.items.length - 1) ? '<tr><td style="padding-top:18px;"></td></tr>' : ''}`).join("");
 
   const toolsItems = tools?.items || [];
-  const toolsHTML = toolsItems.map((item, i) => `
+  const newTools = toolsItems.filter(item => item.type !== 'daily');
+  const dailyTool = toolsItems.find(item => item.type === 'daily');
+
+  const newToolsHTML = newTools.map((item, i) => `
     <tr>
-      <td style="padding:0 0 ${i < toolsItems.length - 1 ? '16' : '0'}px 0;">
+      <td style="padding:0 0 ${i < newTools.length - 1 ? '16' : '0'}px 0;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="card card-border" style="border:1px solid #B79B68;background:#F2F0F0;">
           <tr>
             <td style="padding:18px 22px;">
@@ -144,6 +147,35 @@ export function buildEmailHTML({ news, tools, funding, signal, date }) {
         </table>
       </td>
     </tr>`).join("");
+
+  const dailyToolHTML = dailyTool ? `
+    <tr><td style="padding-top:24px;padding-bottom:14px;">
+      <span class="muted-text" style="font-family:'DM Mono','Courier New',monospace;font-size:10px;font-weight:500;letter-spacing:3px;text-transform:uppercase;color:#B79B68;">▸ DAILY USEFUL TOOL</span>
+    </td></tr>
+    <tr>
+      <td>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="card" style="border-left:4px solid #F1C766;background:#F2F0F0;">
+          <tr>
+            <td style="padding:18px 22px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td>
+                    <span class="tool-name" style="font-family:'Playfair Display','Georgia',serif;font-size:17px;font-weight:700;color:#1C1C1C;letter-spacing:0.3px;">${dailyTool.name || "—"}</span>
+                    <span style="font-family:'DM Mono','Courier New',monospace;font-size:8px;font-weight:500;color:#5A2916;letter-spacing:2px;text-transform:uppercase;background:#F1C766;padding:3px 9px;margin-left:10px;display:inline-block;border-radius:2px;">DAILY PICK</span>
+                    ${dailyTool.category ? `<span style="font-family:'DM Mono','Courier New',monospace;font-size:9px;font-weight:500;color:#FFFFFF;letter-spacing:2px;text-transform:uppercase;background:#88B8CE;padding:3px 9px;margin-left:6px;display:inline-block;border-radius:2px;">${dailyTool.category}</span>` : ""}
+                  </td>
+                </tr>
+                <tr><td style="padding-top:6px;"><span class="body-text" style="font-family:'Lora','Georgia',serif;font-size:13px;color:#1C1C1C;line-height:1.65;">${dailyTool.description || ""}</span></td></tr>
+                <tr><td style="padding-top:5px;"><span class="muted-text" style="font-family:'Lora','Georgia',serif;font-size:12px;color:#B79B68;font-style:italic;line-height:1.5;">Why: ${dailyTool.useCase || ""}</span></td></tr>
+                <tr><td style="padding-top:12px;">${dailyTool.url ? `<a href="${dailyTool.url}" style="font-family:'DM Mono','Courier New',monospace;font-size:11px;color:#88B8CE;text-decoration:none;font-weight:500;">Try it →</a>` : ""}</td></tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>` : "";
+
+  const toolsHTML = newToolsHTML + dailyToolHTML;
 
   const fundingHTML = (funding?.items || []).map((item, i) => `
     <tr>
@@ -281,13 +313,23 @@ export function buildEmailText({ news, tools, funding, signal, date }) {
     lines.push("");
   });
   lines.push("▸ TOOLS & MODELS", "-".repeat(30));
-  (tools?.items || []).forEach((item, i) => {
+  const newToolsTxt = (tools?.items || []).filter(i => i.type !== 'daily');
+  const dailyToolTxt = (tools?.items || []).find(i => i.type === 'daily');
+  newToolsTxt.forEach((item, i) => {
     lines.push(`${i + 1}. ${item.name}`);
     lines.push(`   ${item.description}`);
     lines.push(`   Use case: ${item.useCase}`);
     if (item.url) lines.push(`   ${item.url}`);
     lines.push("");
   });
+  if (dailyToolTxt) {
+    lines.push("▸ DAILY USEFUL TOOL [DAILY PICK]", "-".repeat(30));
+    lines.push(`${dailyToolTxt.name}${dailyToolTxt.category ? ` [${dailyToolTxt.category}]` : ''}`);
+    lines.push(`   ${dailyToolTxt.description}`);
+    lines.push(`   Why: ${dailyToolTxt.useCase}`);
+    if (dailyToolTxt.url) lines.push(`   ${dailyToolTxt.url}`);
+    lines.push("");
+  }
   lines.push("▸ FUNDING & DEALS", "-".repeat(30));
   (funding?.items || []).forEach(item => {
     lines.push(`${item.company}${item.amount ? ` — ${item.amount}` : ""}${item.stage ? ` (${item.stage})` : ""}`);
@@ -421,6 +463,40 @@ export function buildMonthlyHTML({ wrap, monthLabel, date }) {
 
           ${spacer()}
 
+          <!-- MOST USEFUL TOOLS OF THE MONTH -->
+          ${sectionLabel("MOST USEFUL TOOLS OF THE MONTH")}
+          <tr>
+            <td style="padding:14px 32px 0 32px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                ${(wrap?.usefulTools || []).map((item, i) => `
+                <tr>
+                  <td style="padding:0 0 ${i < (wrap.usefulTools.length - 1) ? '14' : '0'}px 0;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="card" style="border-left:4px solid #F1C766;background:#F2F0F0;">
+                      <tr>
+                        <td style="padding:16px 20px;">
+                          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                            <tr>
+                              <td>
+                                <span class="tool-name" style="font-family:'Playfair Display','Georgia',serif;font-size:16px;font-weight:700;color:#1C1C1C;letter-spacing:0.3px;">${item.name || "—"}</span>
+                                <span style="font-family:'DM Mono','Courier New',monospace;font-size:8px;font-weight:500;color:#5A2916;letter-spacing:2px;text-transform:uppercase;background:#F1C766;padding:2px 8px;margin-left:8px;display:inline-block;border-radius:2px;">DAILY PICK</span>
+                                ${item.category ? `<span style="font-family:'DM Mono','Courier New',monospace;font-size:9px;font-weight:500;color:#FFFFFF;letter-spacing:2px;text-transform:uppercase;background:#88B8CE;padding:2px 8px;margin-left:6px;display:inline-block;border-radius:2px;">${item.category}</span>` : ""}
+                              </td>
+                            </tr>
+                            <tr><td style="padding-top:5px;"><span class="body-text" style="font-family:'Lora','Georgia',serif;font-size:12px;color:#1C1C1C;line-height:1.6;">${item.description || item.tagline || ""}</span></td></tr>
+                            <tr><td style="padding-top:4px;"><span class="muted-text" style="font-family:'Lora','Georgia',serif;font-size:11px;color:#B79B68;font-style:italic;line-height:1.5;">Why: ${item.why || ""}</span></td></tr>
+                            ${item.url ? `<tr><td style="padding-top:10px;"><a href="${item.url}" style="font-family:'DM Mono','Courier New',monospace;font-size:11px;color:#88B8CE;text-decoration:none;font-weight:500;">Try it →</a></td></tr>` : ""}
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>`).join("") || '<tr><td><span class="muted-text" style="font-family:\'Lora\',\'Georgia\',serif;font-size:13px;color:#B79B68;font-style:italic;">No daily picks available this month.</span></td></tr>'}
+              </table>
+            </td>
+          </tr>
+
+          ${spacer()}
+
           <!-- WHAT'S COMING -->
           ${sectionLabel("WHAT'S COMING")}
           <tr>
@@ -492,6 +568,13 @@ export function buildMonthlyText({ wrap, monthLabel, date }) {
     lines.push(`${item.name}`);
     lines.push(`  ${item.description}`);
     lines.push(`  Why: ${item.why}`);
+    lines.push("");
+  });
+  lines.push("▸ MOST USEFUL TOOLS OF THE MONTH", "-".repeat(30));
+  (wrap?.usefulTools || []).forEach(item => {
+    lines.push(`${item.name}${item.category ? ` [${item.category}]` : ''}`);
+    lines.push(`  ${item.description || item.tagline || ''}`);
+    lines.push(`  Why: ${item.why || ''}`);
     lines.push("");
   });
   lines.push("▸ WHAT'S COMING", "-".repeat(30));
