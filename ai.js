@@ -42,7 +42,7 @@ function getRetryAfterMs(err) {
 
   // Header may be either delta-seconds or HTTP-date.
   const asNumber = Number(retryAfter);
-  if (!Number.isNaN(asNumber) && asNumber > 0) {
+  if (Number.isInteger(asNumber) && asNumber > 0) {
     return asNumber * 1000;
   }
 
@@ -82,7 +82,7 @@ async function chat(prompt, model = "mistral-large-latest", maxTokens = 1500) {
         const exponentialMs = RETRY_BASE_MS * Math.pow(2, attempt - 1);
         const jitterMs = Math.floor(Math.random() * RETRY_JITTER_MAX_MS);
         const delay = retryAfterMs ?? (exponentialMs + jitterMs);
-        console.warn(`  [retry] Attempt ${attempt}/${MAX_RETRIES} failed (status=${status ?? "unknown"}: ${message}), retrying in ${delay}ms...`);
+        console.warn(`  [retry] Attempt ${attempt}/${MAX_RETRIES} failed (status=${status ?? "unknown"}, message: ${message}), retrying in ${delay}ms...`);
         await new Promise(r => setTimeout(r, delay));
       } else {
         throw err;
