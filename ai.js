@@ -10,6 +10,7 @@ function getClient() {
 const MAX_RETRIES = 5;
 const RETRY_BASE_MS = 3000;
 const RETRY_JITTER_MAX_MS = 1000;
+const RETRY_MAX_DELAY_MS = 15000;
 // Observed in Mistral 429 payloads as `{"code":"1300","type":"rate_limited",...}`.
 const MISTRAL_RATE_LIMIT_CODE = "1300";
 
@@ -41,15 +42,14 @@ function getRetryAfterMs(err) {
   if (!retryAfter) return undefined;
 
   // Header may be either delta-seconds or HTTP-date.
-  const asNumber = Number(retryAfter);
-  if (Number.isInteger(asNumber) && asNumber > 0) {
+  const asNumber = Number.parseInt(String(retryAfter), 10);
+  if (!Number.isNaN(asNumber) && String(asNumber) === String(retryAfter).trim() && asNumber > 0) {
     return asNumber * 1000;
   }
 
   const parsedDate = Date.parse(retryAfter);
-  if (!Number.isNaN(parsedDate)) {
-    const deltaMs = parsedDate - Date.now();
-    if (deltaMs > 0) return deltaMs;
+  if (!Number.isNaN(parsedDate) && parsedDate > Date.now()) {
+    return parsedDate - Date.now();
   }
 
   return undefined;
@@ -79,7 +79,7 @@ async function chat(prompt, model = "mistral-large-latest", maxTokens = 1500) {
 
       if (isRetryable && attempt < MAX_RETRIES) {
         const retryAfterMs = getRetryAfterMs(err);
-        const exponentialMs = RETRY_BASE_MS * Math.pow(2, attempt - 1);
+        const exponentialMs = Math.min(RETRY_BASE_MS * Math.pow(2, attempt - 1), RETRY_MAX_DELAY_MS);
         const jitterMs = Math.floor(Math.random() * RETRY_JITTER_MAX_MS);
         const delay = retryAfterMs ?? (exponentialMs + jitterMs);
         console.warn(`  [retry] Attempt ${attempt}/${MAX_RETRIES} failed (status=${status ?? "unknown"}, message: ${message}), retrying in ${delay}ms...`);
