@@ -81,7 +81,7 @@ async function chat(prompt, model = "mistral-large-latest", maxTokens = 1500) {
         const retryAfterMs = getRetryAfterMs(err);
         const exponentialMs = RETRY_BASE_MS * Math.pow(2, attempt - 1);
         const jitterMs = Math.floor(Math.random() * RETRY_JITTER_MAX_MS);
-        const delay = (retryAfterMs ?? exponentialMs) + jitterMs;
+        const delay = retryAfterMs ?? (exponentialMs + jitterMs);
         console.warn(`  [retry] Attempt ${attempt}/${MAX_RETRIES} failed (status=${status ?? "unknown"}: ${message}), retrying in ${delay}ms...`);
         await new Promise(r => setTimeout(r, delay));
       } else {
