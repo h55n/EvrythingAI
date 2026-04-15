@@ -9,6 +9,8 @@ function getClient() {
 
 const MAX_RETRIES = 5;
 const RETRY_BASE_MS = 3000;
+const RETRY_JITTER_MAX_MS = 1000;
+const MISTRAL_RATE_LIMIT_CODE = "1300";
 
 function getErrorStatus(err) {
   if (typeof err?.status === "number") return err.status;
@@ -56,7 +58,7 @@ async function chat(prompt, model = "mistral-large-latest", maxTokens = 1500) {
       const isRetryable =
         status === 429 ||
         err?.type === "rate_limited" ||
-        err?.code === "1300" ||
+        err?.code === MISTRAL_RATE_LIMIT_CODE ||
         /rate limit/i.test(message) ||
         err?.code === "ECONNRESET" ||
         err?.code === "ETIMEDOUT" ||
@@ -65,7 +67,7 @@ async function chat(prompt, model = "mistral-large-latest", maxTokens = 1500) {
       if (isRetryable && attempt < MAX_RETRIES) {
         const retryAfterMs = getRetryAfterMs(err);
         const exponentialMs = RETRY_BASE_MS * Math.pow(2, attempt - 1);
-        const jitterMs = Math.floor(Math.random() * 1000);
+        const jitterMs = Math.floor(Math.random() * RETRY_JITTER_MAX_MS);
         const delay = retryAfterMs ?? (exponentialMs + jitterMs);
         console.warn(`  [retry] Attempt ${attempt}/${MAX_RETRIES} failed (status=${status ?? "unknown"}: ${message}), retrying in ${delay}ms...`);
         await new Promise(r => setTimeout(r, delay));
