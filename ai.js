@@ -7,8 +7,53 @@ function getClient() {
   return client;
 }
 
-const MAX_RETRIES = 3;
-const RETRY_BASE_MS = 2000;
+const MAX_RETRIES = 5;
+const RETRY_BASE_MS = 3000;
+const RETRY_JITTER_MAX_MS = 1000;
+const RETRY_MAX_DELAY_MS = 15000;
+// Observed in Mistral 429 payloads as `{"code":"1300","type":"rate_limited",...}`.
+const MISTRAL_RATE_LIMIT_CODE = "1300";
+
+function getErrorStatus(err) {
+  if (typeof err?.status === "number") return err.status;
+  if (typeof err?.response?.status === "number") return err.response.status;
+  if (typeof err?.raw_status_code === "number") return err.raw_status_code;
+  if (typeof err?.body?.raw_status_code === "number") return err.body.raw_status_code;
+
+  if (typeof err?.body === "string") {
+    try {
+      const parsed = JSON.parse(err.body);
+      if (typeof parsed?.raw_status_code === "number") return parsed.raw_status_code;
+    } catch { /* ignore parse failure */ }
+  }
+
+  const msg = err?.message || "";
+  const match = msg.match(/Status\s+(\d{3})/i);
+  return match ? Number(match[1]) : undefined;
+}
+
+function getRetryAfterMs(err) {
+  // SDK/network errors can expose headers either as plain objects or Fetch Headers instances.
+  const retryAfter =
+    err?.headers?.["retry-after"] ??
+    err?.response?.headers?.["retry-after"] ??
+    err?.response?.headers?.get?.("retry-after");
+
+  if (!retryAfter) return undefined;
+
+  // Header may be either delta-seconds or HTTP-date.
+  const asNumber = Number.parseInt(String(retryAfter), 10);
+  if (!Number.isNaN(asNumber) && String(asNumber) === String(retryAfter).trim() && asNumber > 0) {
+    return asNumber * 1000;
+  }
+
+  const parsedDate = Date.parse(retryAfter);
+  if (!Number.isNaN(parsedDate) && parsedDate > Date.now()) {
+    return parsedDate - Date.now();
+  }
+
+  return undefined;
+}
 
 async function chat(prompt, model = "mistral-large-latest", maxTokens = 1500) {
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
@@ -21,10 +66,23 @@ async function chat(prompt, model = "mistral-large-latest", maxTokens = 1500) {
       });
       return res.choices[0].message.content.trim();
     } catch (err) {
-      const isRetryable = err.status === 429 || err.code === "ECONNRESET" || err.code === "ETIMEDOUT" || err.message?.includes("fetch failed");
+      const status = getErrorStatus(err);
+      const message = err?.message || "";
+      const isRetryable =
+        status === 429 ||
+        err?.type === "rate_limited" ||
+        err?.code === MISTRAL_RATE_LIMIT_CODE ||
+        /rate limit/i.test(message) ||
+        err?.code === "ECONNRESET" ||
+        err?.code === "ETIMEDOUT" ||
+        message.includes("fetch failed");
+
       if (isRetryable && attempt < MAX_RETRIES) {
-        const delay = RETRY_BASE_MS * Math.pow(2, attempt - 1);
-        console.warn(`  [retry] Attempt ${attempt}/${MAX_RETRIES} failed (${err.message}), retrying in ${delay}ms...`);
+        const retryAfterMs = getRetryAfterMs(err);
+        const exponentialMs = Math.min(RETRY_BASE_MS * Math.pow(2, attempt - 1), RETRY_MAX_DELAY_MS);
+        const jitterMs = Math.floor(Math.random() * RETRY_JITTER_MAX_MS);
+        const delay = retryAfterMs ?? (exponentialMs + jitterMs);
+        console.warn(`  [retry] Attempt ${attempt}/${MAX_RETRIES} failed (status=${status ?? "unknown"}, message: ${message}), retrying in ${delay}ms...`);
         await new Promise(r => setTimeout(r, delay));
       } else {
         throw err;
