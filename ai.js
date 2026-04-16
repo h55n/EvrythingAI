@@ -8,9 +8,12 @@ function getClient() {
 }
 
 const MAX_RETRIES = 5;
+const RATE_LIMIT_MAX_RETRIES = 9;
 const RETRY_BASE_MS = 3000;
+const RATE_LIMIT_RETRY_BASE_MS = 5000;
 const RETRY_JITTER_MAX_MS = 1000;
 const RETRY_MAX_DELAY_MS = 15000;
+const RATE_LIMIT_RETRY_MAX_DELAY_MS = 60000;
 // Observed in Mistral 429 payloads as `{"code":"1300","type":"rate_limited",...}`.
 const MISTRAL_RATE_LIMIT_CODE = "1300";
 
@@ -55,8 +58,21 @@ function getRetryAfterMs(err) {
   return undefined;
 }
 
+function isMistralRateLimitError(err) {
+  const status = getErrorStatus(err);
+  const message = err?.message || "";
+  return (
+    status === 429 ||
+    err?.type === "rate_limited" ||
+    err?.code === MISTRAL_RATE_LIMIT_CODE ||
+    err?.body?.type === "rate_limited" ||
+    /rate limit/i.test(message)
+  );
+}
+
 async function chat(prompt, model = "mistral-large-latest", maxTokens = 1500) {
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+  let attempt = 1;
+  while (true) {
     try {
       const res = await getClient().chat.complete({
         model,
@@ -68,22 +84,25 @@ async function chat(prompt, model = "mistral-large-latest", maxTokens = 1500) {
     } catch (err) {
       const status = getErrorStatus(err);
       const message = err?.message || "";
+      const isRateLimited = isMistralRateLimitError(err);
       const isRetryable =
-        status === 429 ||
-        err?.type === "rate_limited" ||
-        err?.code === MISTRAL_RATE_LIMIT_CODE ||
-        /rate limit/i.test(message) ||
+        isRateLimited ||
         err?.code === "ECONNRESET" ||
         err?.code === "ETIMEDOUT" ||
         message.includes("fetch failed");
+      const maxAttempts = isRateLimited ? RATE_LIMIT_MAX_RETRIES : MAX_RETRIES;
 
-      if (isRetryable && attempt < MAX_RETRIES) {
+      if (isRetryable && attempt < maxAttempts) {
         const retryAfterMs = getRetryAfterMs(err);
-        const exponentialMs = Math.min(RETRY_BASE_MS * Math.pow(2, attempt - 1), RETRY_MAX_DELAY_MS);
+        const baseMs = isRateLimited ? RATE_LIMIT_RETRY_BASE_MS : RETRY_BASE_MS;
+        const maxDelayMs = isRateLimited ? RATE_LIMIT_RETRY_MAX_DELAY_MS : RETRY_MAX_DELAY_MS;
+        const exponentialMs = Math.min(baseMs * Math.pow(2, attempt - 1), maxDelayMs);
+        const jitteredExponentialMs = Math.round(exponentialMs * (0.7 + Math.random() * 0.6));
         const jitterMs = Math.floor(Math.random() * RETRY_JITTER_MAX_MS);
-        const delay = retryAfterMs ?? (exponentialMs + jitterMs);
-        console.warn(`  [retry] Attempt ${attempt}/${MAX_RETRIES} failed (status=${status ?? "unknown"}, message: ${message}), retrying in ${delay}ms...`);
+        const delay = retryAfterMs ?? (isRateLimited ? jitteredExponentialMs : (exponentialMs + jitterMs));
+        console.warn(`  [retry] Attempt ${attempt}/${maxAttempts} failed (status=${status ?? "unknown"}, message: ${message}), retrying in ${delay}ms...`);
         await new Promise(r => setTimeout(r, delay));
+        attempt++;
       } else {
         throw err;
       }
@@ -222,12 +241,20 @@ Be specific. Reference actual companies or trends from the data above. No generi
 Return ONLY valid JSON, no markdown, no backticks:
 {"bullets":["First bullet here","Second bullet here","Third bullet here"]}`;
 
-  const raw = await chat(prompt);
-  return safeJSON(raw, { bullets: [
-    "Capital continues flowing into foundation model infrastructure while application-layer startups compete for narrowing margins.",
-    "Builders should focus on vertical-specific AI workflows where domain expertise creates defensible moats.",
-    "Watch for consolidation pressure on general-purpose AI tools as incumbents ship native integrations."
-  ] });
+  try {
+    const raw = await chat(prompt);
+    return safeJSON(raw, { bullets: [
+      "Capital continues flowing into foundation model infrastructure while application-layer startups compete for narrowing margins.",
+      "Builders should focus on vertical-specific AI workflows where domain expertise creates defensible moats.",
+      "Watch for consolidation pressure on general-purpose AI tools as incumbents ship native integrations."
+    ] });
+  } catch (err) {
+    if (isMistralRateLimitError(err)) {
+      console.warn("  ⚠️  Signal fallback: Mistral rate-limited after retries. Continuing with fallback signal.");
+      return { bullets: ["Signal unavailable due to rate limiting; see highlights above."] };
+    }
+    throw err;
+  }
 }
 
 // ── Monthly Wrap ────────────────────────────────────────────────
