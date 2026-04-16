@@ -147,7 +147,8 @@ const RETRY_JITTER_MIN_MULTIPLIER = 0.7;
 const RETRY_JITTER_RANGE_MULTIPLIER = 0.6;
 const MAX_BACKOFF_EXPONENT = 10;
 const UNLIMITED_RETRIES = 0;
-const DEFAULT_DAILY_MAX_ATTEMPTS = 3;
+const DEFAULT_DAILY_MAX_RETRIES = 3;
+const DEFAULT_DAILY_MAX_ATTEMPTS = DEFAULT_DAILY_MAX_RETRIES + 1;
 
 
 
@@ -348,7 +349,7 @@ async function run() {
 
         const exponent = Math.min(attempt - 1, MAX_BACKOFF_EXPONENT);
         const exponentialMs = Math.min(baseDelayMs * Math.pow(2, exponent), maxDelayMs);
-        // Apply random jitter multiplier in [0.7, 1.3] to reduce synchronized retry spikes.
+        // Apply random jitter multiplier: 0.7 + random(0, 0.6) = [0.7, 1.3].
         const jitteredMs = Math.round(
           exponentialMs * (RETRY_JITTER_MIN_MULTIPLIER + Math.random() * RETRY_JITTER_RANGE_MULTIPLIER)
         );
