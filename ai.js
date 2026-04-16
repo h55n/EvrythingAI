@@ -14,7 +14,6 @@ const RATE_LIMIT_RETRY_BASE_MS = 5000;
 const RETRY_JITTER_MAX_MS = 1000;
 const RETRY_MAX_DELAY_MS = 15000;
 const RATE_LIMIT_RETRY_MAX_DELAY_MS = 60000;
-// Observed in Mistral 429 payloads as `{"code":"1300","type":"rate_limited",...}`.
 const MISTRAL_RATE_LIMIT_CODE = "1300";
 
 function getErrorStatus(err) {
@@ -27,7 +26,7 @@ function getErrorStatus(err) {
     try {
       const parsed = JSON.parse(err.body);
       if (typeof parsed?.raw_status_code === "number") return parsed.raw_status_code;
-    } catch { /* ignore parse failure */ }
+    } catch { /* ignore */ }
   }
 
   const msg = err?.message || "";
@@ -36,7 +35,6 @@ function getErrorStatus(err) {
 }
 
 function getRetryAfterMs(err) {
-  // SDK/network errors can expose headers either as plain objects or Fetch Headers instances.
   const retryAfter =
     err?.headers?.["retry-after"] ??
     err?.response?.headers?.["retry-after"] ??
@@ -44,7 +42,6 @@ function getRetryAfterMs(err) {
 
   if (!retryAfter) return undefined;
 
-  // Header may be either delta-seconds or HTTP-date.
   const asNumber = Number.parseInt(String(retryAfter), 10);
   if (!Number.isNaN(asNumber) && String(asNumber) === String(retryAfter).trim() && asNumber > 0) {
     return asNumber * 1000;
@@ -119,23 +116,96 @@ function safeJSON(raw, fallback) {
   }
 }
 
-export async function pickTopNews(rawItems) {
-  console.log(`  AI: selecting top 3 from ${rawItems.length} news items...`);
-  const prompt = `You are an AI/tech editor. Below are recent RSS headlines and snippets. Pick the 3 most important stories specifically about AI, machine learning, LLMs, or major tech industry moves (funding, acquisitions, product launches). Ignore generic tech news unless highly significant.
+// ── Daily pipeline — single batched call ────────────────────────
+// Replaces pickTopNews + pickToolDrop (new tools only) + pickFunding + generateSignal
+// Reduces 4 sequential Mistral calls to 1, eliminating RPM rate-limit failures.
 
-ITEMS:
-${rawItems.slice(0, 40).map((i,n) => `[${n}] ${i.title} (${i.source})\n${i.summary}`).join("\n\n")}
+export async function runPipeline(rawNews, rawFunding, rawTools) {
+  console.log(`  AI: running batched pipeline (news=${rawNews.length}, funding=${rawFunding.length}, tools=${rawTools.length})...`);
 
-Return ONLY valid JSON, no markdown, no backticks:
-{"items":[{"headline":"concise rewritten headline","summary":"2 sentence summary of why this matters","source":"Publication name","url":"https://..."}]}`;
+  const prompt = `You are a senior AI/tech analyst. Process the feed data below and return all four sections in a single JSON response.
 
-  const raw = await chat(prompt);
-  return safeJSON(raw, { items: rawItems.slice(0,3).map(i => ({ headline: i.title, summary: i.summary, source: i.source, url: i.url })) });
+── NEWS ITEMS (${rawNews.length} total, showing top 40):
+${rawNews.slice(0, 40).map((i, n) => `[${n}] ${i.title} (${i.source})\n${i.summary}`).join("\n\n")}
+
+── TOOL/PRODUCT ITEMS (${rawTools.length} total):
+${rawTools.slice(0, 30).map((i, n) => `[${n}] ${i.title} (${i.source})\n${i.summary}`).join("\n\n")}
+
+── FUNDING/STARTUP ITEMS (${rawFunding.length} total, showing top 40):
+${[...rawFunding, ...rawNews].slice(0, 40).map((i, n) => `[${n}] ${i.title}\n${i.summary}`).join("\n\n")}
+
+Return ONLY valid JSON with exactly these four keys — no markdown, no backticks:
+
+{
+  "news": {
+    "items": [
+      {"headline":"concise rewritten headline","summary":"2 sentence summary of why this matters","source":"Publication name","url":"https://..."}
+    ]
+  },
+  "tools": {
+    "items": [
+      {"name":"Tool or model name","description":"One sentence — what it does","useCase":"One sentence — best use case for builders","url":"https://...","type":"new"}
+    ]
+  },
+  "funding": {
+    "items": [
+      {"company":"Company name","amount":"e.g. $50M or unknown","stage":"e.g. Series B","investors":"Lead investor","description":"One line on what the company does"}
+    ]
+  },
+  "signal": {
+    "bullets": ["money movement bullet","what to build bullet","what to avoid bullet"]
+  }
 }
 
+Rules:
+- news.items: exactly 3 items — most important AI/tech stories
+- tools.items: exactly 3 items — most interesting NEW AI tools or LLMs, each with type:"new"
+- funding.items: 0–3 items — only include if funding/deal details are clearly mentioned; return [] if none found
+- signal.bullets: exactly 3 items — (1) where capital is flowing, (2) what builders should pursue, (3) risk or crowded space to avoid
+- Be specific. Reference actual companies/products. No filler.`;
+
+  const FALLBACK = {
+    news: {
+      items: rawNews.slice(0, 3).map(i => ({
+        headline: i.title, summary: i.summary, source: i.source, url: i.url,
+      })),
+    },
+    tools: {
+      items: rawTools.slice(0, 3).map(i => ({
+        name: i.title || "—", description: i.summary?.slice(0, 120) || "",
+        useCase: "Useful for AI builders.", url: i.url || "#", type: "new",
+      })),
+    },
+    funding: { items: [] },
+    signal: {
+      bullets: [
+        "Capital continues flowing into foundation model infrastructure while application-layer startups compete for narrowing margins.",
+        "Builders should focus on vertical-specific AI workflows where domain expertise creates defensible moats.",
+        "Watch for consolidation pressure on general-purpose AI tools as incumbents ship native integrations.",
+      ],
+    },
+  };
+
+  try {
+    const raw = await chat(prompt, "mistral-large-latest", 3000);
+    const result = safeJSON(raw, FALLBACK);
+
+    // Ensure type:"new" on all tool items
+    if (result.tools?.items) {
+      result.tools.items = result.tools.items.map(item => ({ ...item, type: item.type || "new" }));
+    }
+
+    return result;
+  } catch (err) {
+    console.warn("  ⚠️  Batched pipeline failed, using fallback:", err.message);
+    return FALLBACK;
+  }
+}
+
+// ── Daily useful tool — kept as a separate call (no feed data needed) ──
 async function pickDailyTool() {
   console.log("  AI: selecting daily useful tool...");
-  const dayTag = new Date().toISOString().slice(0, 10); // YYYY-MM-DD for variety
+  const dayTag = new Date().toISOString().slice(0, 10);
   const prompt = `Today is ${dayTag}. Suggest one genuinely useful tool for AI builders, founders, or investors for daily use. It does not need to be newly launched — just highly practical and underused or worth highlighting today. Pick something different each day.
 Categories: productivity, research, dev tools, APIs, automation, analytics, browser extensions, writing, data.
 Return ONLY valid JSON, no backticks:
@@ -147,117 +217,34 @@ Return ONLY valid JSON, no backticks:
     tagline: "All-in-one workspace for notes, docs, and project management.",
     category: "productivity",
     url: "https://notion.so",
-    why: "Centralizes scattered workflows into one searchable, shareable space."
+    why: "Centralizes scattered workflows into one searchable, shareable space.",
   });
 }
 
-export async function pickToolDrop(rawItems) {
-  console.log(`  AI: selecting top 3 tools/models from ${rawItems.length} items...`);
-  const prompt = `You are a sharp AI tools and models curator. Below are recent items from ProductHunt and HN Show. Pick the 3 most interesting NEW AI tools or newly launched LLMs that builders or investors should know about. Prioritize newly launched LLMs and AI-powered tools.
-
-ITEMS:
-${rawItems.slice(0, 30).map((i,n) => `[${n}] ${i.title} (${i.source})\n${i.summary}`).join("\n\n")}
-
-Return ONLY valid JSON, no markdown, no backticks:
-{"items":[{"name":"Tool or model name","description":"One sentence — what it does","useCase":"One sentence — best use case for builders","url":"https://..."}]}
-
-Return exactly 3 items.`;
-
-  const raw = await chat(prompt);
-  const result = safeJSON(raw, {
-    items: rawItems.slice(0,3).map(i => ({
-      name: i.title || "—",
-      description: i.summary?.slice(0,120) || "",
-      useCase: "Useful for AI builders.",
-      url: i.url || "#",
-    }))
-  });
-  if (!result.items) {
-    result.items = [{
-      name: rawItems[0]?.title || "—",
-      description: rawItems[0]?.summary?.slice(0,120) || "",
-      useCase: "Useful for AI builders.",
-      url: rawItems[0]?.url || "#",
-    }];
-  }
-
-  // Tag existing items as 'new'
-  result.items = result.items.map(item => ({ ...item, type: 'new' }));
-
-  // Fetch and append the daily useful tool as 4th item
+// ── Appends daily tool to a tools result from runPipeline ──────
+export async function appendDailyTool(toolsResult) {
   try {
     const daily = await pickDailyTool();
-    result.items.push({
-      name: daily.name || "—",
-      description: daily.tagline || "",
-      useCase: daily.why || "",
-      category: daily.category || "",
-      url: daily.url || "#",
-      type: "daily",
-    });
+    return {
+      items: [
+        ...(toolsResult?.items || []),
+        {
+          name: daily.name || "—",
+          description: daily.tagline || "",
+          useCase: daily.why || "",
+          category: daily.category || "",
+          url: daily.url || "#",
+          type: "daily",
+        },
+      ],
+    };
   } catch (err) {
     console.warn("  ⚠️  Daily tool pick failed, skipping:", err.message);
-  }
-
-  return result;
-}
-
-export async function pickFunding(rawItems) {
-  console.log(`  AI: extracting funding deals from ${rawItems.length} items...`);
-  const prompt = `You are an AI startup funding analyst. Below are recent news items. Extract up to 3 AI or tech startup funding rounds, acquisitions, or major partnerships announced recently. Only include items where funding/deal details are clearly mentioned.
-
-ITEMS:
-${rawItems.slice(0, 40).map((i,n) => `[${n}] ${i.title}\n${i.summary}`).join("\n\n")}
-
-Return ONLY valid JSON, no markdown, no backticks:
-{"items":[{"company":"Company name","amount":"e.g. $50M or unknown","stage":"e.g. Series B or Acquisition","investors":"Lead investor or acquirer","description":"One line on what the company does"}]}
-
-If no clear funding news is found, return {"items":[]}`;
-
-  const raw = await chat(prompt);
-  return safeJSON(raw, { items: [] });
-}
-
-export async function generateSignal(news, tools, funding) {
-  console.log("  AI: generating investor/builder signal...");
-  const prompt = `You are a sharp analyst writing for both investors and builders in the AI space. Here is today's intelligence:
-
-TOP NEWS:
-${JSON.stringify(news?.items?.slice(0,3), null, 2)}
-
-TOOLS & MODELS:
-${JSON.stringify(tools?.items?.slice(0,3), null, 2)}
-
-FUNDING & DEALS:
-${JSON.stringify(funding?.items?.slice(0,3), null, 2)}
-
-Write exactly 3 Signal bullet points:
-- Bullet 1: Market/money movement — where is capital flowing and why
-- Bullet 2: What to build — what opportunity builders should pursue given today's signals
-- Bullet 3: What to avoid or watch — risks, crowded spaces, or cautionary signals
-
-Be specific. Reference actual companies or trends from the data above. No generic statements. No filler. Each bullet should be one sharp sentence.
-
-Return ONLY valid JSON, no markdown, no backticks:
-{"bullets":["First bullet here","Second bullet here","Third bullet here"]}`;
-
-  try {
-    const raw = await chat(prompt);
-    return safeJSON(raw, { bullets: [
-      "Capital continues flowing into foundation model infrastructure while application-layer startups compete for narrowing margins.",
-      "Builders should focus on vertical-specific AI workflows where domain expertise creates defensible moats.",
-      "Watch for consolidation pressure on general-purpose AI tools as incumbents ship native integrations."
-    ] });
-  } catch (err) {
-    if (isMistralRateLimitError(err)) {
-      console.warn("  ⚠️  Signal fallback: Mistral rate-limited after retries. Continuing with fallback signal.");
-      return { bullets: ["Signal unavailable due to rate limiting; see highlights above."] };
-    }
-    throw err;
+    return toolsResult;
   }
 }
 
-// ── Monthly Wrap ────────────────────────────────────────────────
+// ── Monthly Wrap (unchanged) ─────────────────────────────────────
 
 export async function generateMonthlyWrap(rawNews, rawFunding, rawTools) {
   const monthName = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
@@ -266,13 +253,13 @@ export async function generateMonthlyWrap(rawNews, rawFunding, rawTools) {
   const prompt = `You are a senior AI industry analyst writing a comprehensive monthly wrap-up for ${monthName}. Below is a sample of recent headlines and data from this month's RSS feeds.
 
 NEWS HEADLINES (sample):
-${rawNews.slice(0, 50).map((i,n) => `[${n}] ${i.title} (${i.source})`).join("\n")}
+${rawNews.slice(0, 50).map((i, n) => `[${n}] ${i.title} (${i.source})`).join("\n")}
 
 FUNDING/STARTUPS (sample):
-${rawFunding.slice(0, 30).map((i,n) => `[${n}] ${i.title}`).join("\n")}
+${rawFunding.slice(0, 30).map((i, n) => `[${n}] ${i.title}`).join("\n")}
 
 TOOLS/PRODUCTS (sample):
-${rawTools.slice(0, 20).map((i,n) => `[${n}] ${i.title} (${i.source})`).join("\n")}
+${rawTools.slice(0, 20).map((i, n) => `[${n}] ${i.title} (${i.source})`).join("\n")}
 
 Generate a monthly wrap with these sections:
 
@@ -310,7 +297,7 @@ Return ONLY valid JSON, no markdown, no backticks:
       "Founders should target workflows with high switching costs.",
       "Watch for multimodal model capabilities expanding rapidly.",
       "Prepare for regulatory scrutiny increasing in key markets.",
-      "An incumbent will make a major AI acquisition next month."
-    ]
+      "An incumbent will make a major AI acquisition next month.",
+    ],
   });
 }
