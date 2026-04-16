@@ -144,6 +144,10 @@ const MAX_BACKOFF_EXPONENT = 10;
 const UNLIMITED_RETRIES = 0;
 const DEFAULT_DAILY_MAX_RETRIES = 3;
 const DEFAULT_DAILY_MAX_ATTEMPTS = DEFAULT_DAILY_MAX_RETRIES + 1;
+const DAILY_AI_CALLS_RUN_PIPELINE = 1;
+const DAILY_AI_CALLS_APPEND_DAILY_TOOL = 1;
+const DAILY_AI_CALLS_CURRENT = DAILY_AI_CALLS_RUN_PIPELINE + DAILY_AI_CALLS_APPEND_DAILY_TOOL;
+const DAILY_AI_CALLS_PREVIOUS = 5;
 
 // ── Send emails with per-subscriber error handling ──────────────
 async function sendToSubscribers(resend, subscribers, subject, html, text) {
@@ -199,7 +203,12 @@ async function runDaily(resend, subscribers) {
   const { news, tools: toolsBase, funding, signal } = await runPipeline(rawNews, rawFunding, rawTools);
   const aiIntegration = {
     version: "batched-v2",
-    mistralCalls: { current: 2, previous: 5, runPipeline: 1, appendDailyTool: 1 },
+    mistralCalls: {
+      current: DAILY_AI_CALLS_CURRENT,
+      previous: DAILY_AI_CALLS_PREVIOUS,
+      runPipeline: DAILY_AI_CALLS_RUN_PIPELINE,
+      appendDailyTool: DAILY_AI_CALLS_APPEND_DAILY_TOOL,
+    },
   };
   console.log(`     Integration active: ${aiIntegration.version} (${aiIntegration.mistralCalls.previous} → ${aiIntegration.mistralCalls.current} Mistral calls)`);
   logMonitor({
