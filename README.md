@@ -115,11 +115,11 @@ GitHub repo → **Actions** tab → **EvrythingAI Daily Newsletter** → **Run w
 
 ### Daily retry behavior
 
-If the daily run fails with transient errors (for example API rate limits), it automatically retries until success by default.
+If the daily run fails with transient errors (for example, API rate limits), it automatically retries until success by default.
 
 Optional environment variables:
 
-- `DAILY_RETRY_MAX_ATTEMPTS` → max daily attempts (`0` = keep retrying until success or workflow timeout)
+- `DAILY_RETRY_MAX_ATTEMPTS` → max daily attempts (`0` = retry indefinitely until success or external cancellation/workflow timeout)
 - `DAILY_RETRY_BASE_MS` → initial retry delay in milliseconds (default `15000`)
 - `DAILY_RETRY_MAX_DELAY_MS` → maximum backoff delay in milliseconds (default `300000`)
 

@@ -344,9 +344,10 @@ async function run() {
         const exponentialMs = Math.min(baseDelayMs * Math.pow(2, exponent), maxDelayMs);
         // Jitter range: 70%–130% to reduce synchronized retry spikes.
         const jitteredMs = Math.round(exponentialMs * (0.7 + Math.random() * 0.6));
+        const delayMs = Math.min(jitteredMs, maxDelayMs);
         const status = getErrorStatus(err);
-        console.warn(`\n⚠️  Daily run failed (status=${status ?? "unknown"}, message=${err?.message || "unknown"}). Retrying in ${jitteredMs}ms...`);
-        await sleep(jitteredMs);
+        console.warn(`\n⚠️  Daily run failed (status=${status ?? "unknown"}, message=${err?.message || "unknown"}). Retrying in ${delayMs}ms...`);
+        await sleep(delayMs);
         attempt++;
       }
     }
