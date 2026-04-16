@@ -144,10 +144,10 @@ const MAX_BACKOFF_EXPONENT = 10;
 const UNLIMITED_RETRIES = 0;
 const DEFAULT_DAILY_MAX_RETRIES = 3;
 const DEFAULT_DAILY_MAX_ATTEMPTS = DEFAULT_DAILY_MAX_RETRIES + 1;
-const DAILY_AI_CALLS_RUN_PIPELINE = 1;
-const DAILY_AI_CALLS_APPEND_DAILY_TOOL = 1;
-const DAILY_AI_CALLS_CURRENT = DAILY_AI_CALLS_RUN_PIPELINE + DAILY_AI_CALLS_APPEND_DAILY_TOOL;
-const DAILY_AI_CALLS_PREVIOUS = 5;
+const AI_CALLS_PER_RUN_PIPELINE = 1;
+const AI_CALLS_PER_APPEND_DAILY_TOOL = 1;
+const AI_CALLS_CURRENT_TOTAL = AI_CALLS_PER_RUN_PIPELINE + AI_CALLS_PER_APPEND_DAILY_TOOL;
+const AI_CALLS_PREVIOUS_TOTAL = 5;
 
 // ── Send emails with per-subscriber error handling ──────────────
 async function sendToSubscribers(resend, subscribers, subject, html, text) {
@@ -204,10 +204,10 @@ async function runDaily(resend, subscribers) {
   const aiIntegration = {
     version: "batched-v2",
     mistralCalls: {
-      current: DAILY_AI_CALLS_CURRENT,
-      previous: DAILY_AI_CALLS_PREVIOUS,
-      runPipeline: DAILY_AI_CALLS_RUN_PIPELINE,
-      appendDailyTool: DAILY_AI_CALLS_APPEND_DAILY_TOOL,
+      current: AI_CALLS_CURRENT_TOTAL,
+      previous: AI_CALLS_PREVIOUS_TOTAL,
+      runPipeline: AI_CALLS_PER_RUN_PIPELINE,
+      appendDailyTool: AI_CALLS_PER_APPEND_DAILY_TOOL,
     },
   };
   console.log(`     Integration active: ${aiIntegration.version} (${aiIntegration.mistralCalls.previous} → ${aiIntegration.mistralCalls.current} Mistral calls)`);
