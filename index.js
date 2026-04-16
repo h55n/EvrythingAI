@@ -145,6 +145,7 @@ function getEnvInt(name, fallback) {
 
 const RETRY_JITTER_MIN_FACTOR = 0.7;
 const RETRY_JITTER_RANGE_FACTOR = 0.6;
+const MAX_BACKOFF_EXPONENT = 10;
 
 
 
@@ -344,9 +345,9 @@ async function run() {
         const canRetry = retryable && (maxAttempts <= 0 || attempt < maxAttempts);
         if (!canRetry) throw err;
 
-        const exponent = Math.min(attempt - 1, 10);
+        const exponent = Math.min(attempt - 1, MAX_BACKOFF_EXPONENT);
         const exponentialMs = Math.min(baseDelayMs * Math.pow(2, exponent), maxDelayMs);
-        // Jitter range: 70%–130% to reduce synchronized retry spikes.
+        // Jitter range: min..(min+range), currently 70%..130%, to reduce synchronized retry spikes.
         const jitteredMs = Math.round(
           exponentialMs * (RETRY_JITTER_MIN_FACTOR + Math.random() * RETRY_JITTER_RANGE_FACTOR)
         );
