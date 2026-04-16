@@ -100,6 +100,56 @@ function loadAllSubscribers() {
   return valid;
 }
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function getErrorStatus(err) {
+  if (typeof err?.status === "number") return err.status;
+  if (typeof err?.response?.status === "number") return err.response.status;
+  if (typeof err?.raw_status_code === "number") return err.raw_status_code;
+  if (typeof err?.body?.raw_status_code === "number") return err.body.raw_status_code;
+
+  if (typeof err?.body === "string") {
+    try {
+      const parsed = JSON.parse(err.body);
+      if (typeof parsed?.raw_status_code === "number") return parsed.raw_status_code;
+    } catch { /* ignore parse failure */ }
+  }
+
+  const msg = err?.message || "";
+  const match = msg.match(/Status\s+(\d{3})/i);
+  return match ? Number(match[1]) : undefined;
+}
+
+function isRetryableDailyError(err) {
+  const status = getErrorStatus(err);
+  const message = err?.message || "";
+  return (
+    err?.code === "NO_EMAIL_SENT" ||
+    status === 429 ||
+    (typeof status === "number" && status >= 500) ||
+    err?.code === "ECONNRESET" ||
+    err?.code === "ETIMEDOUT" ||
+    /rate limit/i.test(message) ||
+    /fetch failed/i.test(message)
+  );
+}
+
+function getEnvInt(name, fallback) {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isNaN(parsed) ? fallback : parsed;
+}
+
+const RETRY_JITTER_MIN_MULTIPLIER = 0.7;
+const RETRY_JITTER_RANGE_MULTIPLIER = 0.6;
+const MAX_BACKOFF_EXPONENT = 10;
+const UNLIMITED_RETRIES = 0;
+const DEFAULT_DAILY_MAX_RETRIES = 3;
+const DEFAULT_DAILY_MAX_ATTEMPTS = DEFAULT_DAILY_MAX_RETRIES + 1;
+
 
 
 // ── Send emails with per-subscriber error handling ──────────────
@@ -177,7 +227,9 @@ async function runDaily(resend, subscribers) {
     console.log("\n💡  Common fixes:");
     console.log("    • FROM_EMAIL domain must be verified in Resend dashboard");
     console.log("    • Free tier: can only send to account owner email");
-    process.exit(1);
+    const err = new Error("No emails were sent");
+    err.code = "NO_EMAIL_SENT";
+    throw err;
   }
 
   // Preview
@@ -278,7 +330,37 @@ async function run() {
   if (isMonthly) {
     await runMonthly(resend, subscribers);
   } else {
-    await runDaily(resend, subscribers);
+    const maxAttempts = getEnvInt("DAILY_RETRY_MAX_ATTEMPTS", DEFAULT_DAILY_MAX_ATTEMPTS);
+    const baseDelayMs = Math.max(1000, getEnvInt("DAILY_RETRY_BASE_MS", 15000));
+    const maxDelayMs = Math.max(baseDelayMs, getEnvInt("DAILY_RETRY_MAX_DELAY_MS", 300000));
+
+    let attempt = 1;
+    while (true) {
+      try {
+        if (attempt > 1) {
+          console.log(`\n🔁  Daily pipeline retry attempt ${attempt}${maxAttempts > 0 ? `/${maxAttempts}` : ""}`);
+        }
+        await runDaily(resend, subscribers);
+        break;
+      } catch (err) {
+        const retryable = isRetryableDailyError(err);
+        // `attempt` is 1-based and represents total attempts (initial try + retries).
+        const canRetry = retryable && (maxAttempts <= UNLIMITED_RETRIES || attempt < maxAttempts);
+        if (!canRetry) throw err;
+
+        const exponent = Math.min(attempt - 1, MAX_BACKOFF_EXPONENT);
+        const exponentialMs = Math.min(baseDelayMs * Math.pow(2, exponent), maxDelayMs);
+        // Apply random jitter multiplier: 0.7 + random(0, 0.6) = [0.7, 1.3].
+        const jitteredMs = Math.round(
+          exponentialMs * (RETRY_JITTER_MIN_MULTIPLIER + Math.random() * RETRY_JITTER_RANGE_MULTIPLIER)
+        );
+        const delayMs = Math.min(jitteredMs, maxDelayMs);
+        const status = getErrorStatus(err);
+        console.warn(`\n⚠️  Daily run failed (status=${status ?? "unknown"}, message=${err?.message || "unknown"}). Retrying in ${delayMs}ms...`);
+        await sleep(delayMs);
+        attempt++;
+      }
+    }
   }
 }
 

@@ -113,6 +113,20 @@ Delivers once daily at 6:00 AM IST to all subscribers.
 
 GitHub repo → **Actions** tab → **EvrythingAI Daily Newsletter** → **Run workflow** → **Run workflow**
 
+### Daily retry behavior
+
+If the daily run fails with transient errors (for example, API rate limits), it retries up to 3 times by default (4 total attempts).
+
+Optional environment variables:
+
+- `DAILY_RETRY_MAX_ATTEMPTS` → max daily attempts (default `4` total attempts = `3` retries; set `0` to retry indefinitely until success or external cancellation/workflow timeout)
+- `DAILY_RETRY_BASE_MS` → initial retry delay in milliseconds (default `15000`)
+- `DAILY_RETRY_MAX_DELAY_MS` → maximum backoff delay in milliseconds (default `300000`)
+
+Example: `DAILY_RETRY_MAX_ATTEMPTS=4` means 1 initial attempt + 3 retries.
+
+If `DAILY_RETRY_MAX_ATTEMPTS` is a positive number and all attempts are exhausted, the workflow exits with failure.
+
 ### Check logs / debug
 
 GitHub repo → **Actions** tab → click any run → click the **send** job → see full terminal output including what news was picked and the Resend email ID.
