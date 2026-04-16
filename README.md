@@ -103,9 +103,9 @@ Add these 3 secrets:
 
 ### Step 3 — Done
 
-The workflow file at `.github/workflows/newsletter.yml` runs **at 12:30 AM UTC (6:00 AM IST) on Monday and Thursday (testing schedule)**.
+The workflow file at `.github/workflows/newsletter.yml` runs **once daily at 12:30 AM UTC (6:00 AM IST)**.
 
-Delivers on Monday and Thursday at 6:00 AM IST to all subscribers (testing schedule).
+Delivers once daily at 6:00 AM IST to all subscribers.
 
 > **Important:** `subscribers.json` must be committed to the repo — GitHub Actions reads it from the checkout.
 
