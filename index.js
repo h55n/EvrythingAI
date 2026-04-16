@@ -143,9 +143,10 @@ function getEnvInt(name, fallback) {
   return Number.isNaN(parsed) ? fallback : parsed;
 }
 
-const RETRY_JITTER_MIN_FACTOR = 0.7;
-const RETRY_JITTER_RANGE_FACTOR = 0.6;
+const RETRY_JITTER_MIN_MULTIPLIER = 0.7;
+const RETRY_JITTER_RANGE_MULTIPLIER = 0.6;
 const MAX_BACKOFF_EXPONENT = 10;
+const UNLIMITED_RETRIES = 0;
 
 
 
@@ -327,8 +328,7 @@ async function run() {
   if (isMonthly) {
     await runMonthly(resend, subscribers);
   } else {
-    // 0 means unlimited retries for daily runs.
-    const maxAttempts = getEnvInt("DAILY_RETRY_MAX_ATTEMPTS", 0);
+    const maxAttempts = getEnvInt("DAILY_RETRY_MAX_ATTEMPTS", UNLIMITED_RETRIES);
     const baseDelayMs = Math.max(1000, getEnvInt("DAILY_RETRY_BASE_MS", 15000));
     const maxDelayMs = Math.max(baseDelayMs, getEnvInt("DAILY_RETRY_MAX_DELAY_MS", 300000));
 
@@ -342,14 +342,14 @@ async function run() {
         break;
       } catch (err) {
         const retryable = isRetryableDailyError(err);
-        const canRetry = retryable && (maxAttempts <= 0 || attempt < maxAttempts);
+        const canRetry = retryable && (maxAttempts <= UNLIMITED_RETRIES || attempt < maxAttempts);
         if (!canRetry) throw err;
 
         const exponent = Math.min(attempt - 1, MAX_BACKOFF_EXPONENT);
         const exponentialMs = Math.min(baseDelayMs * Math.pow(2, exponent), maxDelayMs);
-        // Jitter range: min..(min+range), currently 70%..130%, to reduce synchronized retry spikes.
+        // Apply random jitter multiplier in [0.7, 1.3] to reduce synchronized retry spikes.
         const jitteredMs = Math.round(
-          exponentialMs * (RETRY_JITTER_MIN_FACTOR + Math.random() * RETRY_JITTER_RANGE_FACTOR)
+          exponentialMs * (RETRY_JITTER_MIN_MULTIPLIER + Math.random() * RETRY_JITTER_RANGE_MULTIPLIER)
         );
         const delayMs = Math.min(jitteredMs, maxDelayMs);
         const status = getErrorStatus(err);
