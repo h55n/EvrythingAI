@@ -323,7 +323,7 @@ async function run() {
   if (isMonthly) {
     await runMonthly(resend, subscribers);
   } else {
-    const maxAttempts = getEnvInt("DAILY_RETRY_MAX_ATTEMPTS", 0); // 0 means retry until job timeout/success
+    const maxAttempts = getEnvInt("DAILY_RETRY_MAX_ATTEMPTS", 0); // 0 means retry indefinitely until success or external cancellation
     const baseDelayMs = Math.max(1000, getEnvInt("DAILY_RETRY_BASE_MS", 15000));
     const maxDelayMs = Math.max(baseDelayMs, getEnvInt("DAILY_RETRY_MAX_DELAY_MS", 300000));
 
@@ -340,7 +340,9 @@ async function run() {
         const canRetry = retryable && (maxAttempts <= 0 || attempt < maxAttempts);
         if (!canRetry) throw err;
 
-        const exponentialMs = Math.min(baseDelayMs * Math.pow(2, attempt - 1), maxDelayMs);
+        const exponent = Math.min(attempt - 1, 10);
+        const exponentialMs = Math.min(baseDelayMs * Math.pow(2, exponent), maxDelayMs);
+        // Jitter range: 70%–130% to reduce synchronized retry spikes.
         const jitteredMs = Math.round(exponentialMs * (0.7 + Math.random() * 0.6));
         const status = getErrorStatus(err);
         console.warn(`\n⚠️  Daily run failed (status=${status ?? "unknown"}, message=${err?.message || "unknown"}). Retrying in ${jitteredMs}ms...`);
