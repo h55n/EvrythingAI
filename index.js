@@ -3,7 +3,7 @@ import "dotenv/config";
 import { readFileSync, appendFileSync } from "fs";
 import { Resend } from "resend";
 import { collectNews, collectFunding, collectTools } from "./sources.js";
-import { pickTopNews, pickToolDrop, pickFunding, generateSignal, generateMonthlyWrap } from "./ai.js";
+import { runPipeline, appendDailyTool, generateMonthlyWrap } from "./ai.js";
 import { buildEmailHTML, buildEmailText, buildMonthlyHTML, buildMonthlyText } from "./email.js";
 
 // ── Pipeline monitor (local only — gitignored) ─────────────────
@@ -14,8 +14,6 @@ function logMonitor(entry) {
     appendFileSync(MONITOR_FILE, line, "utf-8");
   } catch { /* monitor logging is best-effort */ }
 }
-
-
 
 // ── Top-level error boundary ────────────────────────────────────
 process.on("uncaughtException", (err) => {
@@ -39,8 +37,6 @@ function validateEnv() {
     process.exit(1);
   }
 }
-
-
 
 function isLastDayOfMonth() {
   const now = new Date();
@@ -74,7 +70,6 @@ function loadAllSubscribers() {
 
   const valid = [];
   parsed.forEach((entry, i) => {
-    // Support old string format
     if (typeof entry === "string") {
       if (entry.includes("@")) {
         valid.push({ email: entry });
@@ -150,8 +145,6 @@ const UNLIMITED_RETRIES = 0;
 const DEFAULT_DAILY_MAX_RETRIES = 3;
 const DEFAULT_DAILY_MAX_ATTEMPTS = DEFAULT_DAILY_MAX_RETRIES + 1;
 
-
-
 // ── Send emails with per-subscriber error handling ──────────────
 async function sendToSubscribers(resend, subscribers, subject, html, text) {
   console.log(`\n📧  Sending to ${subscribers.length} subscriber(s) via Resend...`);
@@ -194,7 +187,7 @@ async function runDaily(resend, subscribers) {
 
   console.log(`📅  Date: ${date}\n`);
 
-  console.log("1/5  Collecting raw data from feeds...");
+  console.log("1/3  Collecting raw data from feeds...");
   const [rawNews, rawFunding, rawTools] = await Promise.all([
     collectNews(),
     collectFunding(),
@@ -202,17 +195,11 @@ async function runDaily(resend, subscribers) {
   ]);
   console.log(`     Got ${rawNews.length} news, ${rawFunding.length} funding, ${rawTools.length} tools\n`);
 
-  console.log("2/5  AI: selecting top news...");
-  const news = await pickTopNews(rawNews);
+  console.log("2/3  AI: running batched pipeline (1 Mistral call)...");
+  const { news, tools: toolsBase, funding, signal } = await runPipeline(rawNews, rawFunding, rawTools);
 
-  console.log("3/5  AI: selecting tools & models...");
-  const tools = await pickToolDrop(rawTools);
-
-  console.log("4/5  AI: extracting funding deals...");
-  const funding = await pickFunding([...rawFunding, ...rawNews]);
-
-  console.log("5/5  AI: generating investor/builder signal...");
-  const signal = await generateSignal(news, tools, funding);
+  console.log("3/3  AI: fetching daily useful tool...");
+  const tools = await appendDailyTool(toolsBase);
 
   const payload = { news, tools, funding, signal, date };
   const html = buildEmailHTML(payload);
@@ -248,8 +235,6 @@ async function runDaily(resend, subscribers) {
 
 // ── Monthly wrap pipeline ───────────────────────────────────────
 async function runMonthly(resend, subscribers) {
-  // Guard: only run on the actual last day of the month
-  // Can be bypassed with --force flag or FORCE_MONTHLY=true env var
   const forceMonthly = process.argv.includes("--force") || process.env.FORCE_MONTHLY === "true";
   if (!isLastDayOfMonth() && !forceMonthly) {
     console.log("📅  Not the last day of the month. Exiting cleanly.\n");
@@ -344,13 +329,11 @@ async function run() {
         break;
       } catch (err) {
         const retryable = isRetryableDailyError(err);
-        // `attempt` is 1-based and represents total attempts (initial try + retries).
         const canRetry = retryable && (maxAttempts <= UNLIMITED_RETRIES || attempt < maxAttempts);
         if (!canRetry) throw err;
 
         const exponent = Math.min(attempt - 1, MAX_BACKOFF_EXPONENT);
         const exponentialMs = Math.min(baseDelayMs * Math.pow(2, exponent), maxDelayMs);
-        // Apply random jitter multiplier: 0.7 + random(0, 0.6) = [0.7, 1.3].
         const jitteredMs = Math.round(
           exponentialMs * (RETRY_JITTER_MIN_MULTIPLIER + Math.random() * RETRY_JITTER_RANGE_MULTIPLIER)
         );
