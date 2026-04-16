@@ -197,6 +197,17 @@ async function runDaily(resend, subscribers) {
 
   console.log("2/3  AI: running batched pipeline (1 Mistral call)...");
   const { news, tools: toolsBase, funding, signal } = await runPipeline(rawNews, rawFunding, rawTools);
+  const aiIntegration = {
+    version: "batched-v2",
+    mistralCalls: { current: 2, previous: 5, runPipeline: 1, appendDailyTool: 1 },
+  };
+  console.log(`     Integration active: ${aiIntegration.version} (${aiIntegration.mistralCalls.previous} → ${aiIntegration.mistralCalls.current} Mistral calls)`);
+  logMonitor({
+    mode: "daily",
+    status: "info",
+    event: "ai_pipeline_integration",
+    ...aiIntegration,
+  });
 
   console.log("3/3  AI: fetching daily useful tool...");
   const tools = await appendDailyTool(toolsBase);

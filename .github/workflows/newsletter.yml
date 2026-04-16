@@ -2,7 +2,7 @@ name: EvrythingAI Daily Newsletter
 
 on:
   schedule:
-    - cron: '30 0 * * *'    # 00:30 UTC = 6:00 AM IST daily
+    - cron: '30 0 * * 1,4'  # 00:30 UTC = 6:00 AM IST on Monday and Thursday (2-day test schedule)
   workflow_dispatch:         # Manual trigger from GitHub UI anytime
 
 jobs:

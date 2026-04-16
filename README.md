@@ -16,7 +16,7 @@ Automated daily AI & tech newsletter. Fully cloud-hosted, zero PC dependency, 10
 
 | Service | Role | Free Tier |
 |---|---|---|
-| GitHub Actions | Runs pipeline once daily at 6:00 AM IST | 2,000 min/month (you use ~5) |
+| GitHub Actions | Runs pipeline at 6:00 AM IST on Monday and Thursday (testing) | 2,000 min/month (you use ~5) |
 | Mistral AI | Summarization + Signal generation | Free tier available |
 | Resend | Sends the HTML email | 3,000 emails/month, 100/day |
 
@@ -103,9 +103,9 @@ Add these 3 secrets:
 
 ### Step 3 — Done
 
-The workflow file at `.github/workflows/newsletter.yml` runs **once daily at 12:30 AM UTC (6:00 AM IST)**.
+The workflow file at `.github/workflows/newsletter.yml` runs **at 12:30 AM UTC (6:00 AM IST) on Monday and Thursday (testing schedule)**.
 
-Delivers once daily at 6:00 AM IST to all subscribers.
+Delivers on Monday and Thursday at 6:00 AM IST to all subscribers (testing schedule).
 
 > **Important:** `subscribers.json` must be committed to the repo — GitHub Actions reads it from the checkout.
 
@@ -157,7 +157,7 @@ evrythingai/
 ## How the pipeline works
 
 ```
-GitHub Actions cron (once daily at 6am IST)
+GitHub Actions cron (Monday + Thursday at 6am IST, testing)
          ↓
 index.js — loads all subscribers
          ↓
