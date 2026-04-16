@@ -147,6 +147,7 @@ const RETRY_JITTER_MIN_MULTIPLIER = 0.7;
 const RETRY_JITTER_RANGE_MULTIPLIER = 0.6;
 const MAX_BACKOFF_EXPONENT = 10;
 const UNLIMITED_RETRIES = 0;
+const DEFAULT_DAILY_MAX_ATTEMPTS = 3;
 
 
 
@@ -328,7 +329,7 @@ async function run() {
   if (isMonthly) {
     await runMonthly(resend, subscribers);
   } else {
-    const maxAttempts = getEnvInt("DAILY_RETRY_MAX_ATTEMPTS", UNLIMITED_RETRIES);
+    const maxAttempts = getEnvInt("DAILY_RETRY_MAX_ATTEMPTS", DEFAULT_DAILY_MAX_ATTEMPTS);
     const baseDelayMs = Math.max(1000, getEnvInt("DAILY_RETRY_BASE_MS", 15000));
     const maxDelayMs = Math.max(baseDelayMs, getEnvInt("DAILY_RETRY_MAX_DELAY_MS", 300000));
 
