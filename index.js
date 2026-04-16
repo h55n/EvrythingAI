@@ -344,6 +344,7 @@ async function run() {
         break;
       } catch (err) {
         const retryable = isRetryableDailyError(err);
+        // `attempt` is 1-based and represents total attempts (initial try + retries).
         const canRetry = retryable && (maxAttempts <= UNLIMITED_RETRIES || attempt < maxAttempts);
         if (!canRetry) throw err;
 

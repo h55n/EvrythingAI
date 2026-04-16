@@ -123,6 +123,8 @@ Optional environment variables:
 - `DAILY_RETRY_BASE_MS` → initial retry delay in milliseconds (default `15000`)
 - `DAILY_RETRY_MAX_DELAY_MS` → maximum backoff delay in milliseconds (default `300000`)
 
+Example: `DAILY_RETRY_MAX_ATTEMPTS=4` means 1 initial attempt + 3 retries.
+
 If `DAILY_RETRY_MAX_ATTEMPTS` is a positive number and all attempts are exhausted, the workflow exits with failure.
 
 ### Check logs / debug
