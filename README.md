@@ -56,14 +56,17 @@ Once set up, your PC is completely irrelevant. GitHub's servers run the job auto
 
 ---
 
-### Step 2 — Done locally
+### Step 2 — Run locally
 
 ```bash
 cp .env.example .env
-# fill in your keys in .env
+cp subscribers.example.json subscribers.json
+# fill in your keys in .env and your private subscriber addresses in subscribers.json
 npm install
-npm start           # sends to all subscribers
+npm start
 ```
+
+`subscribers.json` is gitignored on purpose. Never commit real subscriber email addresses.
 
 ---
 
@@ -91,23 +94,24 @@ git push -u origin main
 Go to your repo on GitHub:
 **Settings → Secrets and variables → Actions → New repository secret**
 
-Add these 3 secrets:
+Add these 4 secrets:
 
 | Secret name | Value |
 |---|---|
 | `MISTRAL_API_KEY` | your Mistral key |
 | `RESEND_API_KEY` | your Resend key |
 | `FROM_EMAIL` | `EvrythingAI <onboarding@resend.dev>` |
+| `SUBSCRIBERS_JSON` | JSON array such as `[{"email":"you@example.com"}]` |
 
 > `onboarding@resend.dev` is Resend's official test sender — works immediately with no domain needed.
+
+The subscriber list is reconstructed only inside the GitHub Actions runner and is not committed to the repository.
 
 ### Step 3 — Done
 
 The workflow file at `.github/workflows/newsletter.yml` runs **once daily at 12:30 AM UTC (6:00 AM IST)**.
 
-Delivers once daily at 6:00 AM IST to all subscribers.
-
-> **Important:** `subscribers.json` must be committed to the repo — GitHub Actions reads it from the checkout.
+Delivers once daily at 6:00 AM IST to all subscribers stored in the private `SUBSCRIBERS_JSON` secret.
 
 ### Trigger manually anytime
 
@@ -139,16 +143,16 @@ GitHub repo → **Actions** tab → click any run → click the **send** job →
 evrythingai/
 ├── .github/
 │   └── workflows/
-│       └── newsletter.yml   ← GitHub Actions daily cron (6am IST)
-├── index.js                 ← Main pipeline
-├── sources.js               ← RSS feed collectors
-├── ai.js                    ← Mistral AI summarization + Signal
-├── email.js                 ← HTML + plaintext email builder
-├── subscribers.json         ← Subscriber list (email only)
-├── addsubscriber.js         ← CLI to add subscribers
+│       └── newsletter.yml      ← GitHub Actions daily cron (6am IST)
+├── index.js                    ← Main pipeline
+├── sources.js                  ← RSS feed collectors
+├── ai.js                       ← Mistral AI summarization + Signal
+├── email.js                    ← HTML + plaintext email builder
+├── subscribers.example.json    ← Safe template only; real list stays private
+├── addsubscriber.js            ← CLI to add subscribers locally
 ├── package.json
-├── .env.example             ← Copy to .env for local testing
-├── .gitignore               ← Keeps .env out of git (important!)
+├── .env.example                ← Copy to .env for local testing
+├── .gitignore                  ← Keeps secrets and subscriber data out of git
 └── README.md
 ```
 
@@ -158,6 +162,8 @@ evrythingai/
 
 ```
 GitHub Actions cron (once daily at 6am IST)
+         ↓
+workflow restores subscribers.json from SUBSCRIBERS_JSON secret
          ↓
 index.js — loads all subscribers
          ↓
@@ -189,15 +195,17 @@ index.js — sends via Resend to all subscribers
 
 ## Managing Subscribers
 
-Subscribers are stored in `subscribers.json` — a simple JSON array of email objects.
+Subscriber addresses are private data and must not be stored in Git.
 
-**Add a subscriber via CLI:**
+### Local development
+
+Create the private file from the example:
 
 ```bash
-node addsubscriber.js hello@example.com
+cp subscribers.example.json subscribers.json
 ```
 
-**Manually edit subscribers.json:**
+Then edit `subscribers.json` locally:
 
 ```json
 [
@@ -206,7 +214,17 @@ node addsubscriber.js hello@example.com
 ]
 ```
 
-> **Remember:** After adding subscribers, commit and push `subscribers.json` so GitHub Actions can read it.
+You can also use the existing CLI:
+
+```bash
+node addsubscriber.js hello@example.com
+```
+
+`subscribers.json` is ignored by Git.
+
+### GitHub Actions
+
+Store the full JSON array in the repository secret `SUBSCRIBERS_JSON`. When subscribers change, update that secret rather than committing the list.
 
 ---
 
@@ -216,6 +234,9 @@ node addsubscriber.js hello@example.com
 → Check Actions tab — did the run succeed? Look at the logs.
 → Check spam folder.
 → Make sure the subscriber's email matches the Resend account email (free tier).
+
+**Workflow says `SUBSCRIBERS_JSON` is required**
+→ Add or update the `SUBSCRIBERS_JSON` repository secret under Settings → Secrets and variables → Actions.
 
 **"You can only send to your own email" error**
 → Resend free tier restriction. Verify a domain at resend.com/domains to unlock sending to anyone.
@@ -232,7 +253,7 @@ node addsubscriber.js hello@example.com
 
 1. Verify your own domain at resend.com/domains (free with any domain)
 2. Update `FROM_EMAIL` secret to `EvrythingAI <hello@yourdomain.com>`
-3. Add subscriber emails to `subscribers.json`
+3. Update subscriber addresses through the private `SUBSCRIBERS_JSON` secret
 4. Consider Resend Audiences for large lists (1000+ subscribers)
 
 ---
