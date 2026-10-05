@@ -1,9 +1,10 @@
 // index.js — EvrythingAI main pipeline
 import "dotenv/config";
-import { readFileSync, appendFileSync } from "fs";
+import { readFileSync, appendFileSync, mkdirSync, writeFileSync } from "fs";
 import { Resend } from "resend";
-import { collectNews, collectFunding, collectTools } from "./sources.js";
-import { runPipeline, appendDailyTool, generateMonthlyWrap } from "./ai.js";
+import { collectNews, collectFunding, collectTools, collectToolPool } from "./sources.js";
+import { loadSeen, isSeen, filterUnseen, remember, saveSeen } from "./seen.js";
+import { runPipeline, appendDailyTool, pickFunding, generateMonthlyWrap } from "./ai.js";
 import { buildEmailHTML, buildEmailText, buildMonthlyHTML, buildMonthlyText } from "./email.js";
 
 // ── Pipeline monitor (local only — gitignored) ─────────────────
@@ -29,7 +30,7 @@ process.on("unhandledRejection", (err) => {
 
 // ── Env validation ──────────────────────────────────────────────
 function validateEnv() {
-  const required = ["MISTRAL_API_KEY", "RESEND_API_KEY", "FROM_EMAIL"];
+  const required = [process.env.GROQ_API_KEY ? "GROQ_API_KEY" : process.env.GEMINI_API_KEY ? "GEMINI_API_KEY" : "MISTRAL_API_KEY", "RESEND_API_KEY", "FROM_EMAIL"];
   const missing = required.filter(k => !process.env[k]);
   if (missing.length) {
     console.error(`\n❌  Missing env vars: ${missing.join(", ")}`);
@@ -192,12 +193,22 @@ async function runDaily(resend, subscribers) {
   console.log(`📅  Date: ${date}\n`);
 
   console.log("1/3  Collecting raw data from feeds...");
-  const [rawNews, rawFunding, rawTools] = await Promise.all([
+  const seen = loadSeen();
+  const [allNews, rawFunding, allTools, toolPool] = await Promise.all([
     collectNews(),
     collectFunding(),
     collectTools(),
+    collectToolPool().catch(err => { console.warn("  [warn] tool pool failed:", err.message); return []; }),
   ]);
-  console.log(`     Got ${rawNews.length} news, ${rawFunding.length} funding, ${rawTools.length} tools\n`);
+  const rawNews = filterUnseen(seen, allNews);
+  const rawTools = filterUnseen(seen, allTools);
+  console.log(`     Got ${allNews.length} news (${rawNews.length} unseen), ${rawFunding.length} funding, ${allTools.length} tools (${rawTools.length} unseen), ${toolPool.length} pool\n`);
+
+  if (rawNews.length < 3) {
+    const err = new Error(`Only ${rawNews.length} news item(s) fetched; feeds are down or rate-limited`);
+    err.code = "ECONNRESET";
+    throw err;
+  }
 
   console.log("2/3  AI: running batched pipeline (1 Mistral call)...");
   const { news, tools: toolsBase, funding, signal } = await runPipeline(rawNews, rawFunding, rawTools);
@@ -218,13 +229,18 @@ async function runDaily(resend, subscribers) {
     ...aiIntegration,
   });
 
-  console.log("3/3  AI: fetching daily useful tool...");
-  const tools = await appendDailyTool(toolsBase);
+  console.log("3/3  AI: funding and daily useful tool...");
+  const fundingPick = await pickFunding(rawFunding, allNews, seen, isSeen);
+  const toolsNoDup = { items: (toolsBase?.items || []) };
+  const poolFresh = toolPool.filter(p => !toolsNoDup.items.some(t => t.url === p.url));
+  const tools = await appendDailyTool(toolsNoDup, poolFresh, seen, isSeen);
+  const fundingFinal = { items: fundingPick.items };
 
-  const payload = { news, tools, funding, signal, date };
+  const payload = { news, tools, funding: fundingFinal, signal, date };
   const html = buildEmailHTML(payload);
   const text = buildEmailText(payload);
   const subject = `EvrythingAI — ${date}`;
+  if (process.env.TEST_RECIPIENT) { mkdirSync("out", { recursive: true }); writeFileSync("out/issue.html", html); }
 
   const { successCount, failCount } = await sendToSubscribers(resend, subscribers, subject, html, text);
 
@@ -239,6 +255,12 @@ async function runDaily(resend, subscribers) {
     throw err;
   }
 
+  // Remember what went out so tomorrow's issue is different
+  for (const n of news?.items || []) remember(seen, n.url, n.headline);
+  for (const t of tools?.items || []) remember(seen, t.url, t.name);
+  for (const f of fundingFinal.items) remember(seen, f._key, f.company);
+  if (!process.env.TEST_RECIPIENT) saveSeen(seen);
+
   // Preview
   console.log("\n── CONTENT PREVIEW ─────────────────────────────────────\n");
   console.log("📰  TOP NEWS:");
@@ -246,7 +268,7 @@ async function runDaily(resend, subscribers) {
   console.log("\n🔧  TOOLS & MODELS:");
   (tools?.items || []).forEach((item, i) => console.log(`    ${i+1}. ${item.name} — ${item.description}`));
   console.log("\n💰  FUNDING:");
-  (funding?.items || []).forEach(item => console.log(`    • ${item.company}${item.amount ? ` (${item.amount})` : ""}`));
+  (fundingFinal?.items || []).forEach(item => console.log(`    • ${item.company}${item.amount ? ` (${item.amount})` : ""}`));
   console.log("\n📡  SIGNAL:");
   const sLabels = ["💰", "🔨", "⚠️"];
   (signal?.bullets || []).forEach((b, i) => console.log(`    ${sLabels[i] || "•"} ${b}`));
@@ -367,7 +389,7 @@ async function run() {
   }
 }
 
-run().catch(err => {
+run().then(() => process.exit(0)).catch(err => {
   console.error("\n💥  Fatal error:", err.message);
   if (err.stack) console.error(err.stack);
   logMonitor({ mode: "unknown", status: "crash", error: err.message });

@@ -11,9 +11,18 @@ on:
         default: 'false'
         type: string
 
+concurrency:
+  group: newsletter-monthly
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   send:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repo
@@ -25,12 +34,38 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
+
+      - name: Restore private subscriber list
+        env:
+          SUBSCRIBERS_JSON: ${{ secrets.SUBSCRIBERS_JSON }}
+        run: |
+          if [ -z "$SUBSCRIBERS_JSON" ]; then
+            echo "SUBSCRIBERS_JSON GitHub Actions secret is required" >&2
+            exit 1
+          fi
+          printf '%s' "$SUBSCRIBERS_JSON" > subscribers.json
 
       - name: Run monthly wrap pipeline
         run: node index.js --monthly
         env:
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
           FORCE_MONTHLY: ${{ github.event.inputs.force }}
+
+      - name: Alert on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          gh label create newsletter-failure --color D93F0B --description "Newsletter run failed" 2>/dev/null || true
+          existing=$(gh issue list --label newsletter-failure --state open --json number -q '.[0].number')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "Monthly wrap failed: $url"
+          else
+            gh issue create --label newsletter-failure --title "Monthly wrap run failed" --body "The monthly wrap run failed: $url"
+          fi
