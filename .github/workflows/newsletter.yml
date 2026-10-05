@@ -90,6 +90,14 @@ jobs:
           done
           exit 1
 
+      - name: Upload sent test issue
+        if: always() && github.event.inputs.test_recipient != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-issue
+          path: out/issue.html
+          if-no-files-found: ignore
+
       - name: Save seen-items record
         if: success()
         uses: actions/cache/save@v4

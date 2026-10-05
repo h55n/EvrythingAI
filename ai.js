@@ -299,10 +299,10 @@ export async function runPipeline(rawNews, rawFunding, rawTools) {
   const prompt = `You are a senior AI/tech analyst. Process the feed data below and return all four sections in a single JSON response.
 
 ── NEWS ITEMS (${rawNews.length} total, showing top 40):
-${rawNews.slice(0, 40).map((i, n) => `[${n}] ${i.title} (${i.source})\n${i.summary}`).join("\n\n")}
+${rawNews.slice(0, 40).map((i, n) => `[${n}] ${i.title} (${i.source})\nURL: ${i.url}\n${i.summary}`).join("\n\n")}
 
 ── TOOL/PRODUCT ITEMS (${rawTools.length} total):
-${rawTools.slice(0, 30).map((i, n) => `[${n}] ${i.title} (${i.source})\n${i.summary}`).join("\n\n")}
+${rawTools.slice(0, 30).map((i, n) => `[${n}] ${i.title} (${i.source})\nURL: ${i.url}\n${i.summary}`).join("\n\n")}
 
 ── FUNDING/STARTUP ITEMS (${rawFunding.length} total, showing top 40):
 (funding handled separately)
@@ -335,6 +335,7 @@ Rules:
 - tools.items: exactly 3 items — most interesting NEW AI tools or LLMs, each with type:"new"
 - funding.items: return [] (funding is handled separately)
 - signal.bullets: exactly 3 items — (1) where capital is flowing, (2) what builders should pursue, (3) risk or crowded space to avoid
+- url: copy the exact URL line of the item you used; never shorten it, never write "...", never invent one.
 - Grounding: every fact and number must come from the item's own text above. Do not add capabilities, numbers, dates or claims that are not stated. If an item's text is too thin to describe, skip it and pick another.
 - signal bullets: refer only to companies and trends visible in the items above; no invented counts or round names.
 - Be specific. Reference actual companies/products. No filler.`;
@@ -342,7 +343,10 @@ Rules:
   try {
     const raw = await chat(prompt, "mistral-large-latest", 3000);
     const result = safeJSON(raw, null);
-    const problem = validatePipelineResult(result);
+    const known = new Set([...rawNews, ...rawTools].map(i => i.url));
+    const badUrl = [...(result?.news?.items || []), ...(result?.tools?.items || [])].find(i => !known.has(i.url));
+    const placeholder = JSON.stringify(result || {}).match(/\.\.\.|\u2026|details? (are |is )?(not|un)available|not (provided|available|specified)|no (details|information)/i);
+    const problem = badUrl ? "item url is not a source url" : placeholder ? "placeholder text in output" : validatePipelineResult(result);
     if (problem) {
       const err = new Error(`AI output rejected: ${problem}`);
       err.code = "ECONNRESET";

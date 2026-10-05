@@ -1,6 +1,6 @@
 // index.js — EvrythingAI main pipeline
 import "dotenv/config";
-import { readFileSync, appendFileSync } from "fs";
+import { readFileSync, appendFileSync, mkdirSync, writeFileSync } from "fs";
 import { Resend } from "resend";
 import { collectNews, collectFunding, collectTools, collectToolPool } from "./sources.js";
 import { loadSeen, isSeen, filterUnseen, remember, saveSeen } from "./seen.js";
@@ -240,6 +240,7 @@ async function runDaily(resend, subscribers) {
   const html = buildEmailHTML(payload);
   const text = buildEmailText(payload);
   const subject = `EvrythingAI — ${date}`;
+  if (process.env.TEST_RECIPIENT) { mkdirSync("out", { recursive: true }); writeFileSync("out/issue.html", html); }
 
   const { successCount, failCount } = await sendToSubscribers(resend, subscribers, subject, html, text);
 
