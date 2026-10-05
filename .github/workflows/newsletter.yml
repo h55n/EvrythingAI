@@ -36,6 +36,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Restore seen-items record
+        uses: actions/cache/restore@v4
+        with:
+          path: .seen
+          key: seen-${{ github.run_id }}
+          restore-keys: seen-
+
       - name: Check required secrets
         env:
           SUBSCRIBERS_JSON: ${{ secrets.SUBSCRIBERS_JSON }}
@@ -43,6 +50,8 @@ jobs:
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
+          TEST_RECIPIENT: ${{ github.event.inputs.test_recipient }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
         run: |
@@ -61,7 +70,7 @@ jobs:
           fi
           printf '%s' "$SUBSCRIBERS_JSON" > subscribers.json
           if [ -n "$TEST_RECIPIENT" ]; then
-            node -e 'require("fs").writeFileSync("subscribers.json", JSON.stringify([process.env.TEST_RECIPIENT]))'
+            node -e 'require("fs").writeFileSync("subscribers.json", JSON.stringify(process.env.TEST_RECIPIENT.split(",").map(x=>x.trim()).filter(Boolean)))'
             echo "Test run: sending to a single test recipient only"
           fi
 
@@ -80,6 +89,13 @@ jobs:
             [ "$attempt" = 1 ] && sleep 120
           done
           exit 1
+
+      - name: Save seen-items record
+        if: success()
+        uses: actions/cache/save@v4
+        with:
+          path: .seen
+          key: seen-${{ github.run_id }}
 
       - name: Close failure issue after a good run
         if: success()

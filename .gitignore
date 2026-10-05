@@ -6,3 +6,4 @@ node_modules/
 pipeline_monitor.json
 test-email.js
 CHANGELOG_LOCAL.md
+.seen/

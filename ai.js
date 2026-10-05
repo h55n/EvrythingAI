@@ -267,7 +267,7 @@ ${rawNews.slice(0, 40).map((i, n) => `[${n}] ${i.title} (${i.source})\n${i.summa
 ${rawTools.slice(0, 30).map((i, n) => `[${n}] ${i.title} (${i.source})\n${i.summary}`).join("\n\n")}
 
 ── FUNDING/STARTUP ITEMS (${rawFunding.length} total, showing top 40):
-${[...rawFunding, ...rawNews].slice(0, 40).map((i, n) => `[${n}] ${i.title}\n${i.summary}`).join("\n\n")}
+(funding handled separately)
 
 Return ONLY valid JSON with exactly these four keys — no markdown, no backticks:
 
@@ -295,7 +295,7 @@ Return ONLY valid JSON with exactly these four keys — no markdown, no backtick
 Rules:
 - news.items: exactly 3 items — most important AI/tech stories
 - tools.items: exactly 3 items — most interesting NEW AI tools or LLMs, each with type:"new"
-- funding.items: 0–3 items — only include if funding/deal details are clearly mentioned; return [] if none found
+- funding.items: return [] (funding is handled separately)
 - signal.bullets: exactly 3 items — (1) where capital is flowing, (2) what builders should pursue, (3) risk or crowded space to avoid
 - Be specific. Reference actual companies/products. No filler.`;
 
@@ -321,44 +321,78 @@ Rules:
   }
 }
 
-// ── Daily useful tool — kept as a separate call (no feed data needed) ──
-async function pickDailyTool() {
-  console.log("  AI: selecting daily useful tool...");
-  const dayTag = new Date().toISOString().slice(0, 10);
-  const prompt = `Today is ${dayTag}. Suggest one genuinely useful tool for AI builders, founders, or investors for daily use. It does not need to be newly launched — just highly practical and underused or worth highlighting today. Pick something different each day.
-Categories: productivity, research, dev tools, APIs, automation, analytics, browser extensions, writing, data.
-Return ONLY valid JSON, no backticks:
-{"name":"Tool name","tagline":"One sentence what it does","category":"category here","url":"https://...","why":"One sentence why builders or investors should use this daily"}`;
+// ── Funding & deals — own call, own sources, never empty ───────
+const DEAL_RE = /\b(raises?|raised|raising|funding|series [a-e]|seed round|seed|valuation|acquires?|acquired|acquisition|invests?|backed|led by|\$\s?\d+(\.\d+)?\s?(m|b|million|billion))\b/i;
 
-  const raw = await chat(prompt, "mistral-large-latest", 500);
-  return safeJSON(raw, null);
+export async function pickFunding(rawFunding, rawNews, seen = {}, isSeenFn = () => false) {
+  const pool = [...rawFunding, ...rawNews].filter(i => DEAL_RE.test(`${i.title} ${i.summary}`) && !isSeenFn(seen, i.url, i.title)).slice(0, 25);
+  if (pool.length === 0) return { items: [], pool };
+  console.log(`  AI: picking funding and deals from ${pool.length} candidates...`);
+  const prompt = `Below are recent headlines that mention funding rounds or deals. Pick the 3 most relevant to AI and tech builders and investors. Use only facts stated in the text. If the amount, stage or investor is not stated, write "undisclosed".
+
+${pool.map((i, n) => `[${n}] ${i.title} (${i.source})\n${i.summary}`).join("\n\n")}
+
+Return ONLY valid JSON, no backticks:
+{"items":[{"index":0,"company":"Company name","amount":"e.g. $50M or undisclosed","stage":"e.g. Series B or undisclosed","investors":"lead investor or undisclosed","description":"One line on what the company does and why the deal matters"}]}`;
+  try {
+    const raw = await chat(prompt, "mistral-large-latest", 1200);
+    const parsed = safeJSON(raw, null);
+    const items = (parsed?.items || [])
+      .filter(f => goodText(f.company, 2) && goodText(f.description, 15))
+      .slice(0, 3)
+      .map(f => ({ ...f, url: pool[f.index]?.url || "", _key: pool[f.index]?.url }));
+    if (items.length) return { items, pool };
+    console.warn("  ⚠️  Funding pick unusable, using headline fallback");
+  } catch (err) {
+    console.warn("  ⚠️  Funding pick failed, using headline fallback:", err.message);
+  }
+  const items = pool.slice(0, 3).map(i => ({
+    company: i.title.replace(/\s+[-–|].*$/, "").slice(0, 80),
+    amount: (i.title.match(/\$\s?\d+(\.\d+)?\s?(M|B|million|billion)/i) || ["undisclosed"])[0],
+    stage: "",
+    investors: "",
+    description: i.summary || i.title,
+    url: i.url,
+    _key: i.url,
+  }));
+  return { items, pool };
 }
 
-// ── Appends daily tool to a tools result from runPipeline ──────
-export async function appendDailyTool(toolsResult) {
+// ── Daily useful tool — chosen from a real pool, never skipped ─
+export async function pickDailyToolFromPool(pool, seen = {}, isSeenFn = () => false) {
+  const fresh = pool.filter(i => !isSeenFn(seen, i.url, i.title)).slice(0, 20);
+  if (fresh.length === 0) return null;
+  console.log(`  AI: choosing the daily useful tool from ${fresh.length} candidates...`);
+  const prompt = `Pick the ONE project or model from this list that is most practically useful for AI builders or founders to try today. Use only what the list says about it.
+
+${fresh.map((i, n) => `[${n}] ${i.title} (${i.source})\n${i.summary}`).join("\n\n")}
+
+Return ONLY valid JSON, no backticks:
+{"index":0,"name":"short readable name","tagline":"One sentence on what it does","category":"one or two words","why":"One sentence on why builders should try it"}`;
+  let pick = null;
   try {
-    const daily = await pickDailyTool();
-    if (!daily || !goodText(daily.name, 2) || !goodText(daily.tagline, 15) || !/^https?:\/\//.test(daily.url || "")) {
-      console.warn("  ⚠️  Daily tool pick unusable, skipping the section");
-      return toolsResult;
+    const parsed = safeJSON(await chat(prompt, "mistral-large-latest", 600), null);
+    const src = fresh[parsed?.index];
+    if (src && goodText(parsed.tagline, 15) && goodText(parsed.why, 15)) {
+      pick = { name: goodText(parsed.name, 2) ? parsed.name : src.title, description: parsed.tagline, useCase: parsed.why, category: parsed.category || "", url: src.url, type: "daily", _key: src.url };
     }
-    return {
-      items: [
-        ...(toolsResult?.items || []),
-        {
-          name: daily.name || "—",
-          description: daily.tagline || "",
-          useCase: daily.why || "",
-          category: daily.category || "",
-          url: daily.url || "#",
-          type: "daily",
-        },
-      ],
-    };
   } catch (err) {
-    console.warn("  ⚠️  Daily tool pick failed, skipping:", err.message);
+    console.warn("  ⚠️  Daily tool pick failed, using the top candidate:", err.message);
+  }
+  if (!pick) {
+    const src = fresh[0];
+    pick = { name: src.title.split("/").pop(), description: src.summary.replace(/\s*\(.*$/, "") || src.title, useCase: "Worth a look for builders following this space.", category: src.source, url: src.url, type: "daily", _key: src.url };
+  }
+  return pick;
+}
+
+export async function appendDailyTool(toolsResult, pool = [], seen = {}, isSeenFn = () => false) {
+  const daily = await pickDailyToolFromPool(pool, seen, isSeenFn);
+  if (!daily) {
+    console.warn("  ⚠️  No fresh candidates for the daily tool today");
     return toolsResult;
   }
+  return { items: [...(toolsResult?.items || []), daily] };
 }
 
 // ── Monthly Wrap (unchanged) ─────────────────────────────────────
