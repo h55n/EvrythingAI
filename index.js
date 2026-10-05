@@ -239,7 +239,7 @@ async function runDaily(resend, subscribers) {
   const payload = { news, tools, funding: fundingFinal, signal, date };
   const html = buildEmailHTML(payload);
   const text = buildEmailText(payload);
-  const subject = `EvrythingAI — ${date}`;
+  const subject = `EvrythingAI — ${date}${process.env.EMAIL_VARIANT ? ` [layout ${process.env.EMAIL_VARIANT.toUpperCase()}]` : ""}`;
   if (process.env.TEST_RECIPIENT) { mkdirSync("out", { recursive: true }); writeFileSync("out/issue.html", html); }
 
   const { successCount, failCount } = await sendToSubscribers(resend, subscribers, subject, html, text);

@@ -117,6 +117,8 @@ function footerBlock(date) {
 
 // ── Daily Email ─────────────────────────────────────────────────
 
+const VARIANT = (process.env.EMAIL_VARIANT || "").toUpperCase();
+const OLIVE_PX = `https://raw.githubusercontent.com/h55n/EvrythingAI/${process.env.GITHUB_REF_NAME || "main"}/assets/olive.png`;
 const HERO_URL = `https://raw.githubusercontent.com/h55n/EvrythingAI/${process.env.GITHUB_REF_NAME || "main"}/assets/hero-daisies.jpg`;
 const P = {
   olive: "#4B5121", oliveDeep: "#9BA03A", forest: "#1F2812", cream: "#F6F0DD", paper: "#E8E0C2",
@@ -150,7 +152,7 @@ function linkOut(url, label) {
   return `<a href="${url}" style="font-family:${MONO};font-size:11px;letter-spacing:1px;color:${P.forest};text-decoration:underline;">${label}</a>`;
 }
 
-export function buildEmailHTML(input) {
+function buildEmailHTMLBase(input) {
   const { news, tools, funding, signal, date } = sanitize(input);
 
   const newsItems = news?.items || [];
@@ -210,9 +212,8 @@ export function buildEmailHTML(input) {
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="color-scheme" content="light dark">
-<meta name="supported-color-schemes" content="light dark">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+${VARIANT === "A" || VARIANT === "B" ? "" : '<meta name="color-scheme" content="light dark">\n<meta name="supported-color-schemes" content="light dark">'}
 <title>EvrythingAI — ${date}</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,700;1,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -546,4 +547,20 @@ export function buildMonthlyText({ wrap, monthLabel, date }) {
   lines.push("", "=".repeat(50));
   lines.push("EvrythingAI · Built by Hssn · Monthly Wrap");
   return lines.join("\n");
+}
+
+export function buildEmailHTML(data) {
+  let h = buildEmailHTMLBase(data);
+  if (VARIANT === "B") {
+    h = h.replace('<body class="body"', `<body background="${OLIVE_PX}" class="body"`)
+         .replace('<table role="presentation" class="wrap"', `<table role="presentation" background="${OLIVE_PX}" class="wrap"`)
+         .replace('<td align="center" bgcolor', `<td background="${OLIVE_PX}" align="center" bgcolor`)
+         .replace('<html lang="en">', `<html lang="en" style="background-color:#4B5121;">`);
+  }
+  if (VARIANT === "C") {
+    h = h.replace('<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;table-layout:fixed;">', '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">')
+         .replace('padding:0 20px 40px 20px;', 'padding:0 0 40px 0;')
+         .replace('<html lang="en">', `<html lang="en" style="background-color:#4B5121;">`);
+  }
+  return h;
 }
