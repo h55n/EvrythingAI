@@ -251,6 +251,29 @@ async function chat(prompt, model = "mistral-large-latest", maxTokens = 1500) {
   throw lastErr;
 }
 
+
+// ── Claim guards: every number in a generated line must come from the source text ──
+const NUM_RE = /\$?\d[\d.,]*\s?(%|x\b|k\b|m\b|b\b|t\b|million|billion|trillion|thousand|tokens?|params?|parameters)?/gi;
+const EXTREME_RE = /\b(trillion|quadrillion)\b/i;
+
+function numTokens(text) {
+  return (String(text).match(NUM_RE) || []).map(t => t.replace(/[\s,$]/g, "").toLowerCase()).filter(t => /\d{2,}|[%xkmbt]|million|billion|trillion/.test(t));
+}
+
+function isGrounded(text, sourceText) {
+  const src = String(sourceText).replace(/[\s,$]/g, "").toLowerCase();
+  return numTokens(text).every(t => src.includes(t));
+}
+
+export function guardClaims(text, source) {
+  if (!text) return text;
+  const src = source ? `${source.title} ${source.summary}` : "";
+  if (EXTREME_RE.test(text)) return source ? source.title : "";
+  if (isGrounded(text, src)) return text;
+  console.warn(`  [guard] dropped unsupported figure in: ${String(text).slice(0, 70)}`);
+  return source ? (source.summary.split(/(?<=[.!?])\s/)[0] || source.title) : text.replace(NUM_RE, "").replace(/\s{2,}/g, " ").trim();
+}
+
 // ── Daily pipeline — single batched call ────────────────────────
 // Replaces pickTopNews + pickToolDrop (new tools only) + pickFunding + generateSignal
 // Reduces 4 sequential Mistral calls to 1, eliminating RPM rate-limit failures.
@@ -309,6 +332,15 @@ Rules:
       throw err;
     }
 
+    const bySrc = new Map([...rawNews, ...rawTools].map(i => [i.url, i]));
+    for (const n of result.news.items) n.summary = guardClaims(n.summary, bySrc.get(n.url));
+    for (const t of result.tools.items) {
+      const src = bySrc.get(t.url);
+      t.description = guardClaims(t.description, src);
+      t.useCase = guardClaims(t.useCase, src);
+    }
+    for (const b of result.signal.bullets) if (EXTREME_RE.test(b)) throw Object.assign(new Error("AI output rejected: extreme claim in signal"), { code: "ECONNRESET" });
+
     // Ensure type:"new" on all tool items
     if (result.tools?.items) {
       result.tools.items = result.tools.items.map(item => ({ ...item, type: item.type || "new" }));
@@ -341,7 +373,15 @@ Return ONLY valid JSON, no backticks:
     const items = (parsed?.items || [])
       .filter(f => goodText(f.company, 2) && goodText(f.description, 15))
       .slice(0, 3)
-      .map(f => ({ ...f, url: pool[f.index]?.url || "", _key: pool[f.index]?.url }));
+      .filter(f => pool[f.index])
+      .map(f => {
+        const src = pool[f.index];
+        const text = `${src.title} ${src.summary}`;
+        const named = text.toLowerCase().includes(String(f.company).toLowerCase().split(/\s+/)[0]);
+        const amountOk = !f.amount || /undisclosed|unknown/i.test(f.amount) || isGrounded(f.amount, text);
+        return { ...f, named, amount: amountOk ? f.amount : "undisclosed", description: guardClaims(f.description, src), url: src.url, _key: src.url };
+      })
+      .filter(f => f.named && ((f.amount && !/undisclosed|unknown/i.test(f.amount)) || (f.stage && !/undisclosed|unknown/i.test(f.stage))));
     if (items.length) return { items, pool };
     console.warn("  ⚠️  Funding pick unusable, using headline fallback");
   } catch (err) {
