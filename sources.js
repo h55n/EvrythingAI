@@ -151,7 +151,7 @@ export async function collectToolPool() {
   const since = new Date(Date.now() - 10 * 86400000).toISOString().slice(0, 10);
   const gh = process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {};
   const [repos, models] = await Promise.allSettled([
-    getJSON(`https://api.github.com/search/repositories?q=${encodeURIComponent(`topic:llm OR topic:ai-agents OR topic:generative-ai created:>${since} stars:>40`)}&sort=stars&order=desc&per_page=15`, gh),
+    getJSON(`https://api.github.com/search/repositories?q=${encodeURIComponent(`llm created:>${since} stars:>40`)}&sort=stars&order=desc&per_page=15`, gh),
     getJSON("https://huggingface.co/api/models?sort=trendingScore&limit=12"),
   ]);
   const out = [];

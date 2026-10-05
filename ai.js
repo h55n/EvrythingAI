@@ -325,10 +325,11 @@ Rules:
 const DEAL_RE = /\b(raises?|raised|raising|funding|series [a-e]|seed round|seed|valuation|acquires?|acquired|acquisition|invests?|backed|led by|\$\s?\d+(\.\d+)?\s?(m|b|million|billion))\b/i;
 
 export async function pickFunding(rawFunding, rawNews, seen = {}, isSeenFn = () => false) {
-  const pool = [...rawFunding, ...rawNews].filter(i => DEAL_RE.test(`${i.title} ${i.summary}`) && !isSeenFn(seen, i.url, i.title)).slice(0, 25);
+  const AGG_RE = /\b(global|quarter|Q[1-4]|report|index|ranking|statistics|trends?|billion in funding|so far this year|weekly|monthly|recap|roundup)\b/i;
+  const pool = [...rawFunding, ...rawNews].filter(i => DEAL_RE.test(`${i.title} ${i.summary}`) && !AGG_RE.test(i.title) && !isSeenFn(seen, i.url, i.title)).slice(0, 25);
   if (pool.length === 0) return { items: [], pool };
   console.log(`  AI: picking funding and deals from ${pool.length} candidates...`);
-  const prompt = `Below are recent headlines that mention funding rounds or deals. Pick the 3 most relevant to AI and tech builders and investors. Use only facts stated in the text. If the amount, stage or investor is not stated, write "undisclosed".
+  const prompt = `Below are recent headlines that mention funding rounds or deals. Pick up to 3 that are each about ONE named company raising money or being acquired, relevant to AI and tech builders and investors. Skip market summaries, quarterly or global statistics, rankings and reports. Use only facts stated in the text. If the amount, stage or investor is not stated, write "undisclosed".
 
 ${pool.map((i, n) => `[${n}] ${i.title} (${i.source})\n${i.summary}`).join("\n\n")}
 
