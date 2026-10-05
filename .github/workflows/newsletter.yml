@@ -35,11 +35,13 @@ jobs:
         env:
           SUBSCRIBERS_JSON: ${{ secrets.SUBSCRIBERS_JSON }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
         run: |
           missing=""
-          for name in SUBSCRIBERS_JSON MISTRAL_API_KEY RESEND_API_KEY FROM_EMAIL; do
+          [ -z "$GEMINI_API_KEY" ] && [ -z "$MISTRAL_API_KEY" ] && missing=" GEMINI_API_KEY"
+          for name in SUBSCRIBERS_JSON RESEND_API_KEY FROM_EMAIL; do
             if [ -z "${!name}" ]; then missing="$missing $name"; fi
           done
           if [ -n "$missing" ]; then
@@ -56,6 +58,7 @@ jobs:
         id: pipeline
         env:
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
         run: |

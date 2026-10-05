@@ -149,7 +149,51 @@ function isModelNotAllowed(err) {
   return (status === 403 || status === 404) && /tier_not_allowed|not available in your subscription|model.*not found|invalid model/i.test(text);
 }
 
+const GEMINI_CHAIN = [process.env.GEMINI_MODEL, "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash"].filter(Boolean);
+
+async function geminiOnce(prompt, model, maxTokens) {
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-goog-api-key": process.env.GEMINI_API_KEY },
+    body: JSON.stringify({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.4, maxOutputTokens: maxTokens + 2000 },
+    }),
+    signal: AbortSignal.timeout(90000),
+  });
+  if (!res.ok) {
+    const body = (await res.text()).slice(0, 300);
+    const err = new Error(`Gemini ${model} HTTP ${res.status}: ${body}`);
+    err.status = res.status;
+    throw err;
+  }
+  const data = await res.json();
+  const text = (data.candidates?.[0]?.content?.parts || []).map(p => p.text || "").join("").trim();
+  if (!text) throw new Error(`Gemini ${model} returned no text (finish: ${data.candidates?.[0]?.finishReason})`);
+  return text;
+}
+
+async function chatGemini(prompt, maxTokens) {
+  let lastErr;
+  for (const m of [...new Set(GEMINI_CHAIN)]) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        return await geminiOnce(prompt, m, maxTokens);
+      } catch (err) {
+        lastErr = err;
+        const retry = err.status === 429 || err.status >= 500 || err.name === "TimeoutError";
+        console.warn(`  [gemini] ${m} attempt ${attempt} failed: ${String(err.message).slice(0, 160)}`);
+        if (err.status === 404 || err.status === 403 || err.status === 400) break;
+        if (!retry) break;
+        await new Promise(r => setTimeout(r, 5000 * attempt));
+      }
+    }
+  }
+  throw lastErr;
+}
+
 async function chat(prompt, model = "mistral-large-latest", maxTokens = 1500) {
+  if (process.env.GEMINI_API_KEY) return chatGemini(prompt, maxTokens);
   const chain = [...new Set([...(model && model !== "mistral-large-latest" ? [model] : []), ...MODEL_CHAIN])];
   let lastErr;
   for (const m of chain) {

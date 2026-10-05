@@ -29,7 +29,7 @@ process.on("unhandledRejection", (err) => {
 
 // ── Env validation ──────────────────────────────────────────────
 function validateEnv() {
-  const required = ["MISTRAL_API_KEY", "RESEND_API_KEY", "FROM_EMAIL"];
+  const required = [process.env.GEMINI_API_KEY ? "GEMINI_API_KEY" : "MISTRAL_API_KEY", "RESEND_API_KEY", "FROM_EMAIL"];
   const missing = required.filter(k => !process.env[k]);
   if (missing.length) {
     console.error(`\n❌  Missing env vars: ${missing.join(", ")}`);
