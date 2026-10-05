@@ -117,205 +117,134 @@ function footerBlock(date) {
 
 // ── Daily Email ─────────────────────────────────────────────────
 
+const HERO_URL = `https://raw.githubusercontent.com/h55n/EvrythingAI/${process.env.GITHUB_REF_NAME || "main"}/assets/hero-daisies.jpg`;
+const P = {
+  olive: "#A8AA35", oliveDeep: "#8E9029", forest: "#2E3A1C", cream: "#FBF6E9", paper: "#F3EDD8",
+  ink: "#26301A", muted: "#6B6F2A", stitch: "#FBF6E9", gold: "#E9C45B",
+};
+const SERIF = "'Cormorant Garamond','Playfair Display',Georgia,'Times New Roman',serif";
+const BODY = "Georgia,'Lora','Times New Roman',serif";
+const MONO = "'DM Mono','Courier New',monospace";
+
+function stitchRow(color = P.stitch, n = 22) {
+  return `<div style="font-family:${MONO};font-size:11px;letter-spacing:5px;line-height:1;color:${color};opacity:0.85;text-align:left;white-space:nowrap;overflow:hidden;max-width:100%;">${"✕ ".repeat(n)}</div>`;
+}
+
+function sectionHead(label) {
+  return `
+    <tr><td style="padding:34px 0 14px 0;">
+      <div style="font-family:${MONO};font-size:11px;font-weight:500;letter-spacing:3px;text-transform:uppercase;color:${P.cream};">${label}</div>
+      <div style="padding-top:8px;">${stitchRow(P.cream, 14)}</div>
+    </td></tr>`;
+}
+
+function card(inner, bg = P.cream) {
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:${bg};"><tr><td class="pad" style="padding:22px 26px;">${inner}</td></tr></table>`;
+}
+
+function tag(text, bg = P.olive, fg = P.forest) {
+  return `<span style="font-family:${MONO};font-size:10px;letter-spacing:2px;text-transform:uppercase;background:${bg};color:${fg};padding:3px 8px;display:inline-block;">${text}</span>`;
+}
+
+function linkOut(url, label) {
+  return `<a href="${url}" style="font-family:${MONO};font-size:11px;letter-spacing:1px;color:${P.forest};text-decoration:underline;">${label}</a>`;
+}
+
 export function buildEmailHTML(input) {
   const { news, tools, funding, signal, date } = sanitize(input);
-  const newsHTML = (news?.items || []).map((item, i) => `
-    <tr>
-      <td style="padding:0 0 20px 0;${i < (news.items.length - 1) ? "border-bottom:1px solid rgba(183,155,104,0.2);" : ""}">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-          <tr>
-            <td>
-              <a href="${item.url || "#"}" class="headline-text" style="font-family:'Playfair Display','Georgia',serif;font-size:18px;font-weight:700;color:#5A2916;text-decoration:none;display:block;margin-bottom:8px;line-height:1.35;">${item.headline || ""}</a>
-              <p class="body-text" style="font-family:'Lora','Georgia',serif;font-size:14px;color:#1C1C1C;line-height:1.75;margin:0 0 10px 0;">${item.summary || ""}</p>
-              <table role="presentation" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td style="padding:3px 10px;border-radius:2px;border:1px solid #88B8CE;">
-                    <span style="font-family:'DM Mono','Courier New',monospace;font-size:9px;font-weight:500;color:#88B8CE;letter-spacing:2px;text-transform:uppercase;">${item.source || ""}</span>
-                  </td>
-                  <td style="padding-left:12px;">
-                    <a href="${item.url || "#"}" style="font-family:'DM Mono','Courier New',monospace;font-size:10px;color:#88B8CE;text-decoration:none;">Read →</a>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-    ${i < (news.items.length - 1) ? '<tr><td style="padding-top:18px;"></td></tr>' : ''}`).join("");
 
-  const toolsItems = tools?.items || [];
-  const newTools = toolsItems.filter(item => item.type !== 'daily');
-  const dailyTool = toolsItems.find(item => item.type === 'daily');
+  const newsItems = news?.items || [];
+  const newsHTML = newsItems.map((item, i) => `
+    <div style="padding:${i === 0 ? "0" : "18px"} 0 ${i === newsItems.length - 1 ? "0" : "18px"} 0;${i < newsItems.length - 1 ? `border-bottom:1px solid ${P.olive};` : ""}">
+      <a href="${item.url || "#"}" style="font-family:${SERIF};font-size:24px;font-weight:700;line-height:1.2;color:${P.forest};text-decoration:none;display:block;margin:0 0 8px 0;">${item.headline || ""}</a>
+      <p style="font-family:${BODY};font-size:15px;line-height:1.65;color:${P.ink};margin:0 0 12px 0;">${item.summary || ""}</p>
+      ${item.source ? tag(item.source) : ""}&nbsp; ${linkOut(item.url || "#", "Read →")}
+    </div>`).join("");
 
-  const newToolsHTML = newTools.map((item, i) => `
-    <tr>
-      <td style="padding:0 0 ${i < newTools.length - 1 ? '16' : '0'}px 0;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="card card-border" style="border:1px solid #B79B68;background:#F2F0F0;">
-          <tr>
-            <td style="padding:18px 22px;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td>
-                    <span class="tool-name" style="font-family:'Playfair Display','Georgia',serif;font-size:17px;font-weight:700;color:#1C1C1C;letter-spacing:0.3px;">${item.name || "—"}</span>
-                    ${item.category ? `<span style="font-family:'DM Mono','Courier New',monospace;font-size:9px;font-weight:500;color:#FFFFFF;letter-spacing:2px;text-transform:uppercase;background:#88B8CE;padding:3px 9px;margin-left:10px;display:inline-block;border-radius:2px;">${item.category}</span>` : ""}
-                  </td>
-                </tr>
-                <tr><td style="padding-top:6px;"><span class="body-text" style="font-family:'Lora','Georgia',serif;font-size:13px;color:#1C1C1C;line-height:1.65;">${item.description || ""}</span></td></tr>
-                ${item.useCase ? `<tr><td style="padding-top:5px;"><span class="muted-text" style="font-family:'Lora','Georgia',serif;font-size:12px;color:#B79B68;font-style:italic;line-height:1.5;">Use case: ${item.useCase}</span></td></tr>` : ""}
-                <tr><td style="padding-top:12px;">${item.url ? `<a href="${item.url}" style="font-family:'DM Mono','Courier New',monospace;font-size:11px;color:#88B8CE;text-decoration:none;font-weight:500;">Try it →</a>` : ""}</td></tr>
-              </table>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>`).join("");
+  const toolItems = tools?.items || [];
+  const newTools = toolItems.filter(t => t.type !== "daily");
+  const daily = toolItems.find(t => t.type === "daily");
 
-  const dailyToolHTML = dailyTool ? `
-    <tr><td style="padding-top:24px;padding-bottom:14px;">
-      <span class="muted-text" style="font-family:'DM Mono','Courier New',monospace;font-size:10px;font-weight:500;letter-spacing:3px;text-transform:uppercase;color:#B79B68;">▸ DAILY USEFUL TOOL</span>
-    </td></tr>
-    <tr>
-      <td>
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="card" style="border-left:4px solid #F1C766;background:#F2F0F0;">
-          <tr>
-            <td style="padding:18px 22px;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td>
-                    <span class="tool-name" style="font-family:'Playfair Display','Georgia',serif;font-size:17px;font-weight:700;color:#1C1C1C;letter-spacing:0.3px;">${dailyTool.name || "—"}</span>
-                    <span style="font-family:'DM Mono','Courier New',monospace;font-size:8px;font-weight:500;color:#5A2916;letter-spacing:2px;text-transform:uppercase;background:#F1C766;padding:3px 9px;margin-left:10px;display:inline-block;border-radius:2px;">DAILY PICK</span>
-                    ${dailyTool.category ? `<span style="font-family:'DM Mono','Courier New',monospace;font-size:9px;font-weight:500;color:#FFFFFF;letter-spacing:2px;text-transform:uppercase;background:#88B8CE;padding:3px 9px;margin-left:6px;display:inline-block;border-radius:2px;">${dailyTool.category}</span>` : ""}
-                  </td>
-                </tr>
-                <tr><td style="padding-top:6px;"><span class="body-text" style="font-family:'Lora','Georgia',serif;font-size:13px;color:#1C1C1C;line-height:1.65;">${dailyTool.description || ""}</span></td></tr>
-                ${dailyTool.useCase ? `<tr><td style="padding-top:5px;"><span class="muted-text" style="font-family:'Lora','Georgia',serif;font-size:12px;color:#B79B68;font-style:italic;line-height:1.5;">Why: ${dailyTool.useCase}</span></td></tr>` : ""}
-                <tr><td style="padding-top:12px;">${dailyTool.url ? `<a href="${dailyTool.url}" style="font-family:'DM Mono','Courier New',monospace;font-size:11px;color:#88B8CE;text-decoration:none;font-weight:500;">Try it →</a>` : ""}</td></tr>
-              </table>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>` : "";
+  const toolHTML = newTools.map((item, i) => `
+    <tr><td style="padding:0 0 ${i < newTools.length - 1 ? 12 : 0}px 0;">${card(`
+      <div style="font-family:${SERIF};font-size:21px;font-weight:700;color:${P.forest};line-height:1.25;">${item.name || ""}${item.category ? `&nbsp; ${tag(item.category)}` : ""}</div>
+      ${item.description ? `<p style="font-family:${BODY};font-size:14px;line-height:1.6;color:${P.ink};margin:8px 0 0 0;">${item.description}</p>` : ""}
+      ${item.useCase ? `<p style="font-family:${BODY};font-size:13px;font-style:italic;line-height:1.55;color:${P.muted};margin:6px 0 0 0;">Use case: ${item.useCase}</p>` : ""}
+      <div style="padding-top:10px;">${linkOut(item.url || "#", "Try it →")}</div>`)}
+    </td></tr>`).join("");
 
-  const toolsHTML = newToolsHTML + dailyToolHTML;
+  const dailyHTML = daily ? `
+    ${sectionHead("Daily useful tool")}
+    <tr><td>${card(`
+      <div style="font-family:${SERIF};font-size:23px;font-weight:700;color:${P.forest};line-height:1.25;">${daily.name || ""}${daily.category ? `&nbsp; ${tag(daily.category, P.gold)}` : ""}</div>
+      ${daily.description ? `<p style="font-family:${BODY};font-size:14px;line-height:1.6;color:${P.ink};margin:8px 0 0 0;">${daily.description}</p>` : ""}
+      ${daily.useCase ? `<p style="font-family:${BODY};font-size:13px;font-style:italic;line-height:1.55;color:${P.muted};margin:6px 0 0 0;">Why: ${daily.useCase}</p>` : ""}
+      <div style="padding-top:10px;">${linkOut(daily.url || "#", "Try it →")}</div>`, P.paper)}
+    </td></tr>` : "";
 
-  const fundingHTML = (funding?.items || []).map((item, i) => `
-    <tr>
-      <td style="padding:0 0 16px 0;${i < (funding.items.length - 1) ? "border-bottom:1px solid rgba(183,155,104,0.2);" : ""}">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-          <tr>
-            <td>
-              <span class="company-name" style="font-family:'Playfair Display','Georgia',serif;font-size:16px;font-weight:700;color:#1C1C1C;letter-spacing:0.3px;">${item.company || ""}</span>
-              ${item.amount ? `<span style="font-family:'DM Mono','Courier New',monospace;font-size:12px;color:#1C1C1C;font-weight:700;background:#F1C766;padding:2px 9px;margin-left:10px;display:inline-block;border-radius:2px;">${item.amount}${item.stage ? ` · ${item.stage}` : ""}</span>` : ""}
-            </td>
-          </tr>
-          <tr><td style="padding-top:5px;"><span class="body-text" style="font-family:'Lora','Georgia',serif;font-size:12px;color:#1C1C1C;line-height:1.65;opacity:0.85;">${item.description || ""}</span></td></tr>
-          ${item.investors ? `<tr><td style="padding-top:4px;"><span class="muted-text" style="font-family:'DM Mono','Courier New',monospace;font-size:10px;color:#B79B68;letter-spacing:0.5px;">Lead: ${item.investors}</span></td></tr>` : ""}
-        </table>
-      </td>
-    </tr>
-    ${i < (funding.items.length - 1) ? '<tr><td style="padding-top:12px;"></td></tr>' : ''}`).join("");
+  const fundItems = funding?.items || [];
+  const fundHTML = fundItems.length ? `
+    ${sectionHead("Funding &amp; deals")}
+    <tr><td>${card(fundItems.map((f, i) => `
+      <div style="padding:${i === 0 ? "0" : "14px"} 0 ${i === fundItems.length - 1 ? "0" : "14px"} 0;${i < fundItems.length - 1 ? `border-bottom:1px solid ${P.olive};` : ""}">
+        <div style="font-family:${SERIF};font-size:20px;font-weight:700;color:${P.forest};">${f.company || ""}${f.amount ? `&nbsp; ${tag(f.amount, P.gold)}` : ""}${f.stage ? `&nbsp; ${tag(f.stage, P.paper, P.muted)}` : ""}</div>
+        ${f.description ? `<p style="font-family:${BODY};font-size:14px;line-height:1.6;color:${P.ink};margin:6px 0 0 0;">${f.description}</p>` : ""}
+        ${f.investors ? `<div style="font-family:${MONO};font-size:10px;letter-spacing:1px;color:${P.muted};padding-top:6px;">Lead: ${f.investors}</div>` : ""}
+      </div>`).join(""))}
+    </td></tr>` : "";
 
   const bullets = signal?.bullets || [];
-  const signalBulletsHTML = bullets.map((bullet, i) => {
-    const labels = ["💰", "🔨", "⚠️"];
-    return `
-      <tr>
-        <td style="padding:${i > 0 ? '12' : '0'}px 0 0 0;">
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-            <tr>
-              <td width="28" style="vertical-align:top;padding-top:2px;font-size:14px;">${labels[i] || "▸"}</td>
-              <td style="vertical-align:top;">
-                <p style="font-family:'Lora','Georgia',serif;font-size:13px;line-height:1.8;color:#FFFFFF;margin:0;font-weight:400;">${bullet}</p>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>`;
-  }).join("");
+  const bulletLabels = ["Money", "Build", "Avoid"];
+  const signalHTML = bullets.length ? `
+    ${sectionHead("Signal")}
+    <tr><td style="background-color:${P.forest};"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td class="pad" style="padding:24px 26px;">
+      <div style="font-family:${SERIF};font-size:22px;font-style:italic;color:${P.cream};padding-bottom:12px;">Today's pattern</div>
+      ${bullets.map((b, i) => `
+        <div style="padding:0 0 ${i < bullets.length - 1 ? 14 : 0}px 0;">
+          <div style="font-family:${MONO};font-size:10px;letter-spacing:3px;text-transform:uppercase;color:${P.gold};padding-bottom:3px;">${bulletLabels[i] || "Note"}</div>
+          <div style="font-family:${BODY};font-size:15px;line-height:1.6;color:${P.cream};">${b}</div>
+        </div>`).join("")}
+    </td></tr></table></td></tr>` : "";
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="color-scheme" content="light dark">
-  <meta name="supported-color-schemes" content="light dark">
-  <title>EvrythingAI — ${date}</title>
-  <!--[if mso]><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml><![endif]-->
-  ${FONTS_LINK}
-  ${DARK_MODE_STYLES}
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light only">
+<meta name="supported-color-schemes" content="light only">
+<title>EvrythingAI — ${date}</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,700;1,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  @media only screen and (max-width: 480px) {
+    .pad { padding: 18px 18px !important; }
+    .masthead { font-size: 40px !important; }
+    .gutter { padding-left: 14px !important; padding-right: 14px !important; }
+  }
+</style>
 </head>
-<body class="wrapper" style="margin:0;padding:0;background-color:#FAF8F5;font-family:'Lora','Georgia',serif;color:#1C1C1C;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="wrapper" style="background-color:#FAF8F5;">
-    <tr>
-      <td align="center" style="padding:36px 16px;">
-        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
-
-          ${headerBlock("", date)}
-          ${spacer()}
-          ${sectionLabel("TOP NEWS")}
-
-          <tr>
-            <td style="padding:14px 32px 0 32px;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="card" style="background-color:#F2F0F0;padding:22px 26px;">
-                ${newsHTML}
-              </table>
-            </td>
-          </tr>
-
-          ${spacer()}
-          ${sectionLabel("TOOLS &amp; MODELS")}
-
-          <tr>
-            <td style="padding:14px 32px 0 32px;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                ${toolsHTML}
-              </table>
-            </td>
-          </tr>
-
-          ${spacer()}
-          ${sectionLabel("FUNDING &amp; DEALS")}
-
-          <tr>
-            <td style="padding:14px 32px 0 32px;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="card" style="background-color:#F2F0F0;padding:22px 26px;">
-                ${funding?.items?.length > 0 ? fundingHTML : '<tr><td><span class="muted-text" style="font-family:\'Lora\',\'Georgia\',serif;font-size:13px;color:#B79B68;font-style:italic;">No significant funding news found today.</span></td></tr>'}
-              </table>
-            </td>
-          </tr>
-
-          ${spacer()}
-          ${sectionLabel("SIGNAL")}
-
-          <tr>
-            <td style="padding:14px 32px 0 32px;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#A5503A;">
-                <tr>
-                  <td style="padding:26px 28px;">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                      <tr><td><span style="font-family:'DM Mono','Courier New',monospace;font-size:9px;color:rgba(255,255,255,0.55);letter-spacing:3px;text-transform:uppercase;">◈ TODAY'S PATTERN</span></td></tr>
-                      <tr>
-                        <td style="padding-top:16px;">
-                          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                            ${signalBulletsHTML}
-                          </table>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-
-          ${footerBlock(date)}
-
-        </table>
-      </td>
-    </tr>
+<body style="margin:0;padding:0;background-color:${P.olive};font-family:${BODY};color:${P.ink};">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:${P.olive};">
+    <tr><td align="center" class="gutter" style="padding:0 20px 40px 20px;">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;table-layout:fixed;">
+        <tr><td style="padding:0;"><img src="${HERO_URL}" width="600" alt="" style="display:block;width:100%;max-width:600px;height:auto;border:0;"></td></tr>
+        <tr><td style="padding:28px 0 6px 0;">
+          <div style="font-family:${MONO};font-size:11px;letter-spacing:3px;text-transform:uppercase;color:${P.cream};">${date}</div>
+          <div class="masthead" style="font-family:${SERIF};font-size:52px;line-height:1.02;font-weight:500;color:${P.cream};padding-top:10px;">Evrything<em style="font-style:italic;">AI</em></div>
+          <div style="font-family:${SERIF};font-size:22px;line-height:1.3;color:${P.cream};padding-top:8px;">The day in AI, <em>quietly</em> sorted.</div>
+        </td></tr>
+        ${sectionHead("Top news")}
+        <tr><td>${card(newsHTML)}</td></tr>
+        ${newTools.length ? sectionHead("Tools &amp; models") + toolHTML : ""}
+        ${dailyHTML}
+        ${fundHTML}
+        ${signalHTML}
+        <tr><td style="padding:36px 0 0 0;">
+          ${stitchRow(P.cream, 22)}
+          <div style="font-family:${MONO};font-size:10px;letter-spacing:2px;text-transform:uppercase;color:${P.cream};padding-top:12px;line-height:1.8;">EvrythingAI &middot; built by h55n &middot; ${date}</div>
+        </td></tr>
+      </table>
+    </td></tr>
   </table>
 </body>
 </html>`;
@@ -444,7 +373,7 @@ export function buildMonthlyHTML(input) {
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="wrapper" style="background-color:#FAF8F5;">
     <tr>
       <td align="center" style="padding:36px 16px;">
-        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;table-layout:fixed;">
 
           ${headerBlock("MONTHLY WRAP", monthLabel)}
           ${spacer()}
