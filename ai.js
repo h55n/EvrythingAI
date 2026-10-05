@@ -207,7 +207,7 @@ async function chatGemini(prompt, maxTokens) {
   throw lastErr;
 }
 
-const GROQ_CHAIN = [process.env.GROQ_MODEL, "openai/gpt-oss-20b", "openai/gpt-oss-120b", "llama-3.3-70b-versatile", "llama-3.1-8b-instant"].filter(Boolean);
+const GROQ_CHAIN = [process.env.GROQ_MODEL, "openai/gpt-oss-120b", "openai/gpt-oss-20b", "llama-3.3-70b-versatile", "llama-3.1-8b-instant"].filter(Boolean);
 
 async function groqOnce(prompt, model, maxTokens) {
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
