@@ -320,6 +320,8 @@ Rules:
 - tools.items: exactly 3 items — most interesting NEW AI tools or LLMs, each with type:"new"
 - funding.items: return [] (funding is handled separately)
 - signal.bullets: exactly 3 items — (1) where capital is flowing, (2) what builders should pursue, (3) risk or crowded space to avoid
+- Grounding: every fact and number must come from the item's own text above. Do not add capabilities, numbers, dates or claims that are not stated. If an item's text is too thin to describe, skip it and pick another.
+- signal bullets: refer only to companies and trends visible in the items above; no invented counts or round names.
 - Be specific. Reference actual companies/products. No filler.`;
 
   try {
