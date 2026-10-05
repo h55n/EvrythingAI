@@ -211,11 +211,14 @@ export function buildEmailHTML(input) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="color-scheme" content="light only">
-<meta name="supported-color-schemes" content="light only">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
 <title>EvrythingAI — ${date}</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,700;1,500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
+  html, body { margin:0 !important; padding:0 !important; width:100% !important; background-color:#4B5121 !important; }
+  u + .body .wrap, .body .wrap { background-color:#4B5121 !important; }
+  @media (prefers-color-scheme: dark) { html, body, .wrap, .wrap td { background-color:#4B5121 !important; } }
   @media only screen and (max-width: 480px) {
     .pad { padding: 18px 18px !important; }
     .masthead { font-size: 40px !important; }
@@ -223,9 +226,10 @@ export function buildEmailHTML(input) {
   }
 </style>
 </head>
-<body style="margin:0;padding:0;background-color:${P.olive};font-family:${BODY};color:${P.ink};">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:${P.olive};">
-    <tr><td align="center" class="gutter" style="padding:0 20px 40px 20px;">
+<body class="body" bgcolor="${P.olive}" style="margin:0;padding:0;width:100%;min-width:100%;background-color:${P.olive};font-family:${BODY};color:${P.ink};">
+  <div style="background-color:${P.olive};width:100%;">
+  <table role="presentation" class="wrap" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${P.olive}" style="width:100%;min-width:100%;background-color:${P.olive};">
+    <tr><td align="center" bgcolor="${P.olive}" class="gutter" style="padding:0 20px 40px 20px;background-color:${P.olive};">
       <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;table-layout:fixed;">
         <tr><td style="padding:0;"><img src="${HERO_URL}" width="600" alt="" style="display:block;width:100%;max-width:600px;height:auto;border:0;"></td></tr>
         <tr><td style="padding:28px 0 6px 0;">
@@ -246,6 +250,7 @@ export function buildEmailHTML(input) {
       </table>
     </td></tr>
   </table>
+  </div>
 </body>
 </html>`;
 }
