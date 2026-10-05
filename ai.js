@@ -116,6 +116,31 @@ function safeJSON(raw, fallback) {
   }
 }
 
+const PLACEHOLDER = /^(x|a|b|c|n\/a|tbd|todo|lorem ipsum.*|\.\.\.|—|-)$/i;
+
+function goodText(v, min) {
+  return typeof v === "string" && v.trim().length >= min && !PLACEHOLDER.test(v.trim());
+}
+
+function validatePipelineResult(r) {
+  if (!r || typeof r !== "object") return "not a JSON object";
+  const news = r.news?.items;
+  if (!Array.isArray(news) || news.length < 3) return "fewer than 3 news items";
+  for (const n of news) {
+    if (!goodText(n.headline, 10) || !goodText(n.summary, 30) || !/^https?:\/\//.test(n.url || "")) return "news item incomplete";
+  }
+  const tools = r.tools?.items;
+  if (!Array.isArray(tools) || tools.length < 1) return "no tools";
+  for (const t of tools) {
+    if (!goodText(t.name, 2) || !goodText(t.description, 15) || !goodText(t.useCase, 15)) return "tool item incomplete";
+  }
+  const bullets = r.signal?.bullets;
+  if (!Array.isArray(bullets) || bullets.length < 3 || !bullets.every(b => goodText(b, 30))) return "signal incomplete";
+  if (r.funding?.items && !Array.isArray(r.funding.items)) return "funding malformed";
+  r.funding = { items: (r.funding?.items || []).filter(f => goodText(f.company, 2) && goodText(f.description, 15)) };
+  return null;
+}
+
 // ── Daily pipeline — single batched call ────────────────────────
 // Replaces pickTopNews + pickToolDrop (new tools only) + pickFunding + generateSignal
 // Reduces 4 sequential Mistral calls to 1, eliminating RPM rate-limit failures.
@@ -164,31 +189,15 @@ Rules:
 - signal.bullets: exactly 3 items — (1) where capital is flowing, (2) what builders should pursue, (3) risk or crowded space to avoid
 - Be specific. Reference actual companies/products. No filler.`;
 
-  const FALLBACK = {
-    news: {
-      items: rawNews.slice(0, 3).map(i => ({
-        headline: i.title, summary: i.summary, source: i.source, url: i.url,
-      })),
-    },
-    tools: {
-      items: rawTools.slice(0, 3).map(i => ({
-        name: i.title || "—", description: i.summary?.slice(0, 120) || "",
-        useCase: "Useful for AI builders.", url: i.url || "#", type: "new",
-      })),
-    },
-    funding: { items: [] },
-    signal: {
-      bullets: [
-        "Capital continues flowing into foundation model infrastructure while application-layer startups compete for narrowing margins.",
-        "Builders should focus on vertical-specific AI workflows where domain expertise creates defensible moats.",
-        "Watch for consolidation pressure on general-purpose AI tools as incumbents ship native integrations.",
-      ],
-    },
-  };
-
   try {
     const raw = await chat(prompt, "mistral-large-latest", 3000);
-    const result = safeJSON(raw, FALLBACK);
+    const result = safeJSON(raw, null);
+    const problem = validatePipelineResult(result);
+    if (problem) {
+      const err = new Error(`AI output rejected: ${problem}`);
+      err.code = "ECONNRESET";
+      throw err;
+    }
 
     // Ensure type:"new" on all tool items
     if (result.tools?.items) {
@@ -197,8 +206,8 @@ Rules:
 
     return result;
   } catch (err) {
-    console.warn("  ⚠️  Batched pipeline failed, using fallback:", err.message);
-    return FALLBACK;
+    console.warn("  ⚠️  Batched pipeline failed:", err.message);
+    throw err;
   }
 }
 
@@ -212,19 +221,17 @@ Return ONLY valid JSON, no backticks:
 {"name":"Tool name","tagline":"One sentence what it does","category":"category here","url":"https://...","why":"One sentence why builders or investors should use this daily"}`;
 
   const raw = await chat(prompt, "mistral-large-latest", 500);
-  return safeJSON(raw, {
-    name: "Notion",
-    tagline: "All-in-one workspace for notes, docs, and project management.",
-    category: "productivity",
-    url: "https://notion.so",
-    why: "Centralizes scattered workflows into one searchable, shareable space.",
-  });
+  return safeJSON(raw, null);
 }
 
 // ── Appends daily tool to a tools result from runPipeline ──────
 export async function appendDailyTool(toolsResult) {
   try {
     const daily = await pickDailyTool();
+    if (!daily || !goodText(daily.name, 2) || !goodText(daily.tagline, 15) || !/^https?:\/\//.test(daily.url || "")) {
+      console.warn("  ⚠️  Daily tool pick unusable, skipping the section");
+      return toolsResult;
+    }
     return {
       items: [
         ...(toolsResult?.items || []),
