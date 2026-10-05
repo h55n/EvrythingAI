@@ -268,10 +268,10 @@ function isGrounded(text, sourceText) {
 export function guardClaims(text, source) {
   if (!text) return text;
   const src = source ? `${source.title} ${source.summary}` : "";
-  if (EXTREME_RE.test(text)) return source ? source.title : "";
+  if (EXTREME_RE.test(text)) return source ? source.title : null;
   if (isGrounded(text, src)) return text;
   console.warn(`  [guard] dropped unsupported figure in: ${String(text).slice(0, 70)}`);
-  return source ? (source.summary.split(/(?<=[.!?])\s/)[0] || source.title) : text.replace(NUM_RE, "").replace(/\s{2,}/g, " ").trim();
+  return source ? (source.summary.split(/(?<=[.!?])\s/)[0] || source.title) : null;
 }
 
 // ── Daily pipeline — single batched call ────────────────────────
@@ -335,12 +335,19 @@ Rules:
     }
 
     const bySrc = new Map([...rawNews, ...rawTools].map(i => [i.url, i]));
-    for (const n of result.news.items) n.summary = guardClaims(n.summary, bySrc.get(n.url));
-    for (const t of result.tools.items) {
-      const src = bySrc.get(t.url);
-      t.description = guardClaims(t.description, src);
-      t.useCase = guardClaims(t.useCase, src);
+    for (const n of result.news.items) {
+      const g = guardClaims(n.summary, bySrc.get(n.url));
+      n.summary = g || n.headline;
     }
+    result.tools.items = result.tools.items.filter(t => {
+      const src = bySrc.get(t.url);
+      const d = guardClaims(t.description, src);
+      const u = guardClaims(t.useCase, src);
+      if (!d || !u) { console.warn(`  [guard] dropped tool with unsupported figures: ${t.name}`); return false; }
+      t.description = d; t.useCase = u;
+      return true;
+    });
+    if (result.tools.items.length < 1) throw Object.assign(new Error("AI output rejected: no grounded tools"), { code: "ECONNRESET" });
     for (const b of result.signal.bullets) if (EXTREME_RE.test(b)) throw Object.assign(new Error("AI output rejected: extreme claim in signal"), { code: "ECONNRESET" });
 
     // Ensure type:"new" on all tool items
