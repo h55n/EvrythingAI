@@ -8,7 +8,7 @@ function getClient() {
 }
 
 const MAX_RETRIES = 5;
-const RATE_LIMIT_MAX_RETRIES = 9;
+const RATE_LIMIT_MAX_RETRIES = 4;
 const RETRY_BASE_MS = 3000;
 const RATE_LIMIT_RETRY_BASE_MS = 5000;
 const RETRY_JITTER_MAX_MS = 1000;
