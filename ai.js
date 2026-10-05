@@ -122,9 +122,12 @@ function goodText(v, min) {
   return typeof v === "string" && v.trim().length >= min && !PLACEHOLDER.test(v.trim());
 }
 
+const NON_LATIN = /[\u0400-\u04ff\u0590-\u06ff\u0900-\u0dff\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/;
+
 export function looksIncomplete(t) {
   const s = String(t || "").trim();
   if (!s) return true;
+  if (NON_LATIN.test(s)) return true;
   if (/\b(a|an|the|of|with|for)\s+[\u2010-\u2015-]/i.test(s) || /(^|\s)[\u2010-\u2015-]\w/.test(s)) return true; // gap where a number was
   if (/\b(on|for|a|an|the|and|or|with|to|of|in|that|which|by|from)$/i.test(s.replace(/[.!?]+$/, ""))) return true; // trailing stopword
   if ((s.match(/\(/g) || []).length !== (s.match(/\)/g) || []).length) return true;
@@ -424,7 +427,7 @@ Return ONLY valid JSON, no backticks:
 
 // ── Daily useful tool — chosen from a real pool, never skipped ─
 export async function pickDailyToolFromPool(pool, seen = {}, isSeenFn = () => false) {
-  const fresh = pool.filter(i => !isSeenFn(seen, i.url, i.title)).slice(0, 20);
+  const fresh = pool.filter(i => !isSeenFn(seen, i.url, i.title) && !NON_LATIN.test(`${i.title} ${i.summary}`)).slice(0, 20);
   if (fresh.length === 0) return null;
   console.log(`  AI: choosing the daily useful tool from ${fresh.length} candidates...`);
   const prompt = `Pick the ONE project or model from this list that is most practically useful for AI builders or founders to try today. Use only what the list says about it.
