@@ -192,13 +192,13 @@ async function chatGemini(prompt, maxTokens) {
   throw lastErr;
 }
 
-const GROQ_CHAIN = [process.env.GROQ_MODEL, "llama-3.3-70b-versatile", "openai/gpt-oss-20b", "llama-3.1-8b-instant"].filter(Boolean);
+const GROQ_CHAIN = [process.env.GROQ_MODEL, "openai/gpt-oss-20b", "openai/gpt-oss-120b", "llama-3.3-70b-versatile", "llama-3.1-8b-instant"].filter(Boolean);
 
 async function groqOnce(prompt, model, maxTokens) {
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${process.env.GROQ_API_KEY}` },
-    body: JSON.stringify({ model, messages: [{ role: "user", content: prompt }], temperature: 0.4, max_tokens: maxTokens }),
+    body: JSON.stringify({ model, messages: [{ role: "user", content: prompt }], temperature: 0.4, max_tokens: maxTokens + 1500, ...(model.startsWith("openai/gpt-oss") ? { reasoning_effort: "low" } : {}) }),
     signal: AbortSignal.timeout(90000),
   });
   if (!res.ok) {

@@ -373,7 +373,7 @@ async function run() {
   }
 }
 
-run().catch(err => {
+run().then(() => process.exit(0)).catch(err => {
   console.error("\n💥  Fatal error:", err.message);
   if (err.stack) console.error(err.stack);
   logMonitor({ mode: "unknown", status: "crash", error: err.message });
