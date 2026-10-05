@@ -119,8 +119,8 @@ function footerBlock(date) {
 
 const HERO_URL = `https://raw.githubusercontent.com/h55n/EvrythingAI/${process.env.GITHUB_REF_NAME || "main"}/assets/hero-daisies.jpg`;
 const P = {
-  olive: "#A8AA35", oliveDeep: "#8E9029", forest: "#2E3A1C", cream: "#FBF6E9", paper: "#F3EDD8",
-  ink: "#26301A", muted: "#6B6F2A", stitch: "#FBF6E9", gold: "#E9C45B",
+  olive: "#4B5121", oliveDeep: "#9BA03A", forest: "#1F2812", cream: "#F6F0DD", paper: "#E8E0C2",
+  ink: "#1F2812", muted: "#5A5E1E", stitch: "#C9CC7A", gold: "#E9C45B",
 };
 const SERIF = "'Cormorant Garamond','Playfair Display',Georgia,'Times New Roman',serif";
 const BODY = "Georgia,'Lora','Times New Roman',serif";
@@ -142,7 +142,7 @@ function card(inner, bg = P.cream) {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:${bg};"><tr><td class="pad" style="padding:22px 26px;">${inner}</td></tr></table>`;
 }
 
-function tag(text, bg = P.olive, fg = P.forest) {
+function tag(text, bg = P.oliveDeep, fg = P.forest) {
   return `<span style="font-family:${MONO};font-size:10px;letter-spacing:2px;text-transform:uppercase;background:${bg};color:${fg};padding:3px 8px;display:inline-block;">${text}</span>`;
 }
 
@@ -155,7 +155,7 @@ export function buildEmailHTML(input) {
 
   const newsItems = news?.items || [];
   const newsHTML = newsItems.map((item, i) => `
-    <div style="padding:${i === 0 ? "0" : "18px"} 0 ${i === newsItems.length - 1 ? "0" : "18px"} 0;${i < newsItems.length - 1 ? `border-bottom:1px solid ${P.olive};` : ""}">
+    <div style="padding:${i === 0 ? "0" : "18px"} 0 ${i === newsItems.length - 1 ? "0" : "18px"} 0;${i < newsItems.length - 1 ? `border-bottom:1px solid ${P.oliveDeep};` : ""}">
       <a href="${item.url || "#"}" style="font-family:${SERIF};font-size:24px;font-weight:700;line-height:1.2;color:${P.forest};text-decoration:none;display:block;margin:0 0 8px 0;">${item.headline || ""}</a>
       <p style="font-family:${BODY};font-size:15px;line-height:1.65;color:${P.ink};margin:0 0 12px 0;">${item.summary || ""}</p>
       ${item.source ? tag(item.source) : ""}&nbsp; ${linkOut(item.url || "#", "Read →")}
@@ -186,7 +186,7 @@ export function buildEmailHTML(input) {
   const fundHTML = fundItems.length ? `
     ${sectionHead("Funding &amp; deals")}
     <tr><td>${card(fundItems.map((f, i) => `
-      <div style="padding:${i === 0 ? "0" : "14px"} 0 ${i === fundItems.length - 1 ? "0" : "14px"} 0;${i < fundItems.length - 1 ? `border-bottom:1px solid ${P.olive};` : ""}">
+      <div style="padding:${i === 0 ? "0" : "14px"} 0 ${i === fundItems.length - 1 ? "0" : "14px"} 0;${i < fundItems.length - 1 ? `border-bottom:1px solid ${P.oliveDeep};` : ""}">
         <div style="font-family:${SERIF};font-size:20px;font-weight:700;color:${P.forest};">${f.company || ""}${f.amount ? `&nbsp; ${tag(f.amount, P.gold)}` : ""}${f.stage ? `&nbsp; ${tag(f.stage, P.paper, P.muted)}` : ""}</div>
         ${f.description ? `<p style="font-family:${BODY};font-size:14px;line-height:1.6;color:${P.ink};margin:6px 0 0 0;">${f.description}</p>` : ""}
         ${f.investors ? `<div style="font-family:${MONO};font-size:10px;letter-spacing:1px;color:${P.muted};padding-top:6px;">Lead: ${f.investors}</div>` : ""}
