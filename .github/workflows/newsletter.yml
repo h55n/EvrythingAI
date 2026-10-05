@@ -5,9 +5,18 @@ on:
     - cron: '30 0 * * *'    # 00:30 UTC = 6:00 AM IST daily
   workflow_dispatch:         # Manual trigger from GitHub UI anytime
 
+concurrency:
+  group: newsletter
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   send:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repo
@@ -17,23 +26,66 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: npm
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
-      - name: Restore private subscriber list
+      - name: Check required secrets
         env:
           SUBSCRIBERS_JSON: ${{ secrets.SUBSCRIBERS_JSON }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
         run: |
-          if [ -z "$SUBSCRIBERS_JSON" ]; then
-            echo "SUBSCRIBERS_JSON GitHub Actions secret is required" >&2
+          missing=""
+          for name in SUBSCRIBERS_JSON MISTRAL_API_KEY RESEND_API_KEY FROM_EMAIL; do
+            if [ -z "${!name}" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "Missing GitHub Actions secrets:$missing" >&2
+            exit 1
+          fi
+          if ! printf '%s' "$SUBSCRIBERS_JSON" | node -e 'const a=JSON.parse(require("fs").readFileSync(0,"utf8"));if(!Array.isArray(a)||a.length===0)process.exit(1)'; then
+            echo "SUBSCRIBERS_JSON must be a non-empty JSON array" >&2
             exit 1
           fi
           printf '%s' "$SUBSCRIBERS_JSON" > subscribers.json
 
       - name: Run EvrythingAI pipeline
-        run: node index.js --force
+        id: pipeline
         env:
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
+        run: |
+          for attempt in 1 2; do
+            if node index.js --force; then exit 0; fi
+            echo "Attempt $attempt failed" >&2
+            [ "$attempt" = 1 ] && sleep 120
+          done
+          exit 1
+
+      - name: Close failure issue after a good run
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for n in $(gh issue list --label newsletter-failure --state open --json number -q '.[].number'); do
+            gh issue comment "$n" --body "Back to normal: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            gh issue close "$n"
+          done
+
+      - name: Alert on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          gh label create newsletter-failure --color D93F0B --description "Daily newsletter run failed" 2>/dev/null || true
+          existing=$(gh issue list --label newsletter-failure --state open --json number -q '.[0].number')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "Failed again: $url"
+          else
+            gh issue create --label newsletter-failure --title "Daily newsletter run failed" --body "The daily newsletter run failed: $url"
+          fi

@@ -19,6 +19,28 @@
 // FONTS: Playfair Display (display/headers), DM Mono (labels), Lora (body)
 // ─────────────────────────────────────────────────────────────────
 
+
+// ── Escaping: feed and AI text must never break or inject into the HTML ──
+function esc(v) {
+  return String(v ?? "")
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+function safeUrl(v) {
+  const u = String(v ?? "").trim();
+  return /^https?:\/\//i.test(u) ? esc(u) : "#";
+}
+
+function sanitize(value, key = "") {
+  if (typeof value === "string") return key === "url" ? safeUrl(value) : esc(value);
+  if (Array.isArray(value)) return value.map(v => sanitize(v, key));
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, sanitize(v, k)]));
+  }
+  return value;
+}
+
 // ── Shared helpers ──────────────────────────────────────────────
 const FONTS_LINK = '<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Mono:wght@400;500&family=Lora:wght@400;500;700&display=swap" rel="stylesheet">';
 
@@ -95,7 +117,8 @@ function footerBlock(date) {
 
 // ── Daily Email ─────────────────────────────────────────────────
 
-export function buildEmailHTML({ news, tools, funding, signal, date }) {
+export function buildEmailHTML(input) {
+  const { news, tools, funding, signal, date } = sanitize(input);
   const newsHTML = (news?.items || []).map((item, i) => `
     <tr>
       <td style="padding:0 0 20px 0;${i < (news.items.length - 1) ? "border-bottom:1px solid rgba(183,155,104,0.2);" : ""}">
@@ -139,7 +162,7 @@ export function buildEmailHTML({ news, tools, funding, signal, date }) {
                   </td>
                 </tr>
                 <tr><td style="padding-top:6px;"><span class="body-text" style="font-family:'Lora','Georgia',serif;font-size:13px;color:#1C1C1C;line-height:1.65;">${item.description || ""}</span></td></tr>
-                <tr><td style="padding-top:5px;"><span class="muted-text" style="font-family:'Lora','Georgia',serif;font-size:12px;color:#B79B68;font-style:italic;line-height:1.5;">Use case: ${item.useCase || ""}</span></td></tr>
+                ${item.useCase ? `<tr><td style="padding-top:5px;"><span class="muted-text" style="font-family:'Lora','Georgia',serif;font-size:12px;color:#B79B68;font-style:italic;line-height:1.5;">Use case: ${item.useCase}</span></td></tr>` : ""}
                 <tr><td style="padding-top:12px;">${item.url ? `<a href="${item.url}" style="font-family:'DM Mono','Courier New',monospace;font-size:11px;color:#88B8CE;text-decoration:none;font-weight:500;">Try it →</a>` : ""}</td></tr>
               </table>
             </td>
@@ -166,7 +189,7 @@ export function buildEmailHTML({ news, tools, funding, signal, date }) {
                   </td>
                 </tr>
                 <tr><td style="padding-top:6px;"><span class="body-text" style="font-family:'Lora','Georgia',serif;font-size:13px;color:#1C1C1C;line-height:1.65;">${dailyTool.description || ""}</span></td></tr>
-                <tr><td style="padding-top:5px;"><span class="muted-text" style="font-family:'Lora','Georgia',serif;font-size:12px;color:#B79B68;font-style:italic;line-height:1.5;">Why: ${dailyTool.useCase || ""}</span></td></tr>
+                ${dailyTool.useCase ? `<tr><td style="padding-top:5px;"><span class="muted-text" style="font-family:'Lora','Georgia',serif;font-size:12px;color:#B79B68;font-style:italic;line-height:1.5;">Why: ${dailyTool.useCase}</span></td></tr>` : ""}
                 <tr><td style="padding-top:12px;">${dailyTool.url ? `<a href="${dailyTool.url}" style="font-family:'DM Mono','Courier New',monospace;font-size:11px;color:#88B8CE;text-decoration:none;font-weight:500;">Try it →</a>` : ""}</td></tr>
               </table>
             </td>
@@ -318,7 +341,7 @@ export function buildEmailText({ news, tools, funding, signal, date }) {
   newToolsTxt.forEach((item, i) => {
     lines.push(`${i + 1}. ${item.name}`);
     lines.push(`   ${item.description}`);
-    lines.push(`   Use case: ${item.useCase}`);
+    if (item.useCase) lines.push(`   Use case: ${item.useCase}`);
     if (item.url) lines.push(`   ${item.url}`);
     lines.push("");
   });
@@ -326,7 +349,7 @@ export function buildEmailText({ news, tools, funding, signal, date }) {
     lines.push("▸ DAILY USEFUL TOOL [DAILY PICK]", "-".repeat(30));
     lines.push(`${dailyToolTxt.name}${dailyToolTxt.category ? ` [${dailyToolTxt.category}]` : ''}`);
     lines.push(`   ${dailyToolTxt.description}`);
-    lines.push(`   Why: ${dailyToolTxt.useCase}`);
+    if (dailyToolTxt.useCase) lines.push(`   Why: ${dailyToolTxt.useCase}`);
     if (dailyToolTxt.url) lines.push(`   ${dailyToolTxt.url}`);
     lines.push("");
   }
@@ -350,7 +373,8 @@ export function buildEmailText({ news, tools, funding, signal, date }) {
 
 // ── Monthly Wrap Email ──────────────────────────────────────────
 
-export function buildMonthlyHTML({ wrap, monthLabel, date }) {
+export function buildMonthlyHTML(input) {
+  const { wrap, monthLabel, date } = sanitize(input);
   const topFundedHTML = (wrap?.topFunded || []).map((item, i) => `
     <tr>
       <td style="padding:0 0 16px 0;${i < (wrap.topFunded.length - 1) ? "border-bottom:1px solid rgba(183,155,104,0.2);" : ""}">
@@ -567,7 +591,7 @@ export function buildMonthlyText({ wrap, monthLabel, date }) {
   (wrap?.breakoutTools || []).forEach(item => {
     lines.push(`${item.name}`);
     lines.push(`  ${item.description}`);
-    lines.push(`  Why: ${item.why}`);
+    if (item.why) lines.push(`  Why: ${item.why}`);
     lines.push("");
   });
   lines.push("▸ MOST USEFUL TOOLS OF THE MONTH", "-".repeat(30));

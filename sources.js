@@ -1,7 +1,21 @@
 // sources.js — RSS + web data collection
 import Parser from "rss-parser";
 
-const parser = new Parser({ timeout: 10000 });
+const parser = new Parser({
+  timeout: 15000,
+  headers: {
+    "User-Agent": "Mozilla/5.0 (compatible; EvrythingAI-Newsletter/1.0; +https://github.com/h55n/EvrythingAI)",
+    Accept: "application/rss+xml, application/atom+xml, application/xml;q=0.9, */*;q=0.8",
+  },
+});
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const RETRY_DELAYS_MS = [3000, 8000, 15000];
+
+function isRetryable(err) {
+  const m = err?.message || "";
+  return /Status code (429|5\d\d)/.test(m) || /ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|socket hang up|timed out/i.test(m);
+}
 
 const FEEDS = [
   { name: "TechCrunch AI",   url: "https://techcrunch.com/category/artificial-intelligence/feed/" },
@@ -22,9 +36,31 @@ const TOOL_FEEDS = [
   { name: "Hacker News Show", url: "https://hnrss.org/show?points=50" },
 ];
 
+function cleanSummary(text) {
+  return text
+    .replace(/^(Article URL|Comments URL|Points|# Comments):.*$/gim, "")
+    .replace(/^\s*Discussion \| Link\s*$/gim, "")
+    .replace(/\s+/g, " ")
+    .slice(0, 300)
+    .trim();
+}
+
+async function parseWithRetry(feed) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await parser.parseURL(feed.url);
+    } catch (err) {
+      if (attempt >= RETRY_DELAYS_MS.length || !isRetryable(err)) throw err;
+      const wait = RETRY_DELAYS_MS[attempt] + Math.floor(Math.random() * 1000);
+      console.warn(`  [retry] ${feed.name}: ${err.message} - retrying in ${Math.round(wait / 1000)}s`);
+      await sleep(wait);
+    }
+  }
+}
+
 async function fetchFeed(feed) {
   try {
-    const result = await parser.parseURL(feed.url);
+    const result = await parseWithRetry(feed);
     const cutoff = Date.now() - 48 * 60 * 60 * 1000; // last 48h
     return result.items
       .filter(item => {
@@ -35,7 +71,7 @@ async function fetchFeed(feed) {
       .slice(0, 8)
       .map(item => ({
         title:   item.title?.trim() || "",
-        summary: (item.contentSnippet || item.content || "").slice(0, 300).trim(),
+        summary: cleanSummary(item.contentSnippet || item.content || ""),
         url:     item.link || "",
         date:    item.pubDate || item.isoDate || "",
         source:  feed.name,

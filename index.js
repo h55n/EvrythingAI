@@ -199,6 +199,12 @@ async function runDaily(resend, subscribers) {
   ]);
   console.log(`     Got ${rawNews.length} news, ${rawFunding.length} funding, ${rawTools.length} tools\n`);
 
+  if (rawNews.length < 3) {
+    const err = new Error(`Only ${rawNews.length} news item(s) fetched; feeds are down or rate-limited`);
+    err.code = "ECONNRESET";
+    throw err;
+  }
+
   console.log("2/3  AI: running batched pipeline (1 Mistral call)...");
   const { news, tools: toolsBase, funding, signal } = await runPipeline(rawNews, rawFunding, rawTools);
   const aiIntegration = {
