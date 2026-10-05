@@ -67,7 +67,7 @@ function isMistralRateLimitError(err) {
   );
 }
 
-async function chat(prompt, model = "mistral-large-latest", maxTokens = 1500) {
+async function chatWithModel(prompt, model, maxTokens) {
   let attempt = 1;
   while (true) {
     try {
@@ -139,6 +139,29 @@ function validatePipelineResult(r) {
   if (r.funding?.items && !Array.isArray(r.funding.items)) return "funding malformed";
   r.funding = { items: (r.funding?.items || []).filter(f => goodText(f.company, 2) && goodText(f.description, 15)) };
   return null;
+}
+
+const MODEL_CHAIN = [process.env.MISTRAL_MODEL, "mistral-large-latest", "mistral-small-latest", "open-mistral-nemo"].filter(Boolean);
+
+function isModelNotAllowed(err) {
+  const status = getErrorStatus(err);
+  const text = `${err?.message || ""} ${typeof err?.body === "string" ? err.body : ""}`;
+  return (status === 403 || status === 404) && /tier_not_allowed|not available in your subscription|model.*not found|invalid model/i.test(text);
+}
+
+async function chat(prompt, model = "mistral-large-latest", maxTokens = 1500) {
+  const chain = [...new Set([...(model && model !== "mistral-large-latest" ? [model] : []), ...MODEL_CHAIN])];
+  let lastErr;
+  for (const m of chain) {
+    try {
+      return await chatWithModel(prompt, m, maxTokens);
+    } catch (err) {
+      lastErr = err;
+      if (!isModelNotAllowed(err)) throw err;
+      console.warn(`  [model] ${m} not available on this plan, trying the next one`);
+    }
+  }
+  throw lastErr;
 }
 
 // ── Daily pipeline — single batched call ────────────────────────
