@@ -192,7 +192,50 @@ async function chatGemini(prompt, maxTokens) {
   throw lastErr;
 }
 
+const GROQ_CHAIN = [process.env.GROQ_MODEL, "llama-3.3-70b-versatile", "openai/gpt-oss-20b", "llama-3.1-8b-instant"].filter(Boolean);
+
+async function groqOnce(prompt, model, maxTokens) {
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${process.env.GROQ_API_KEY}` },
+    body: JSON.stringify({ model, messages: [{ role: "user", content: prompt }], temperature: 0.4, max_tokens: maxTokens }),
+    signal: AbortSignal.timeout(90000),
+  });
+  if (!res.ok) {
+    const err = new Error(`Groq ${model} HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    err.status = res.status;
+    err.retryAfter = Number(res.headers.get("retry-after")) || 0;
+    throw err;
+  }
+  const data = await res.json();
+  const text = (data.choices?.[0]?.message?.content || "").trim();
+  if (!text) throw new Error(`Groq ${model} returned no text`);
+  return text;
+}
+
+async function chatGroq(prompt, maxTokens) {
+  let lastErr;
+  for (const m of [...new Set(GROQ_CHAIN)]) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        return await groqOnce(prompt, m, maxTokens);
+      } catch (err) {
+        lastErr = err;
+        console.warn(`  [groq] ${m} attempt ${attempt} failed: ${String(err.message).slice(0, 200)}`);
+        if (err.status === 429 && attempt < 3 && err.retryAfter && err.retryAfter <= 60) {
+          await new Promise(r => setTimeout(r, err.retryAfter * 1000 + 500));
+          continue;
+        }
+        if (err.status >= 500 || err.name === "TimeoutError") { await new Promise(r => setTimeout(r, 4000 * attempt)); continue; }
+        break;
+      }
+    }
+  }
+  throw lastErr;
+}
+
 async function chat(prompt, model = "mistral-large-latest", maxTokens = 1500) {
+  if (process.env.GROQ_API_KEY) return chatGroq(prompt, maxTokens);
   if (process.env.GEMINI_API_KEY) return chatGemini(prompt, maxTokens);
   const chain = [...new Set([...(model && model !== "mistral-large-latest" ? [model] : []), ...MODEL_CHAIN])];
   let lastErr;
