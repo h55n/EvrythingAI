@@ -407,7 +407,8 @@ Return ONLY valid JSON, no backticks:
         const text = `${src.title} ${src.summary}`;
         const named = text.toLowerCase().includes(String(f.company).toLowerCase().split(/\s+/)[0]);
         const amountOk = !f.amount || /undisclosed|unknown/i.test(f.amount) || isGrounded(f.amount, text);
-        return { ...f, named, amount: amountOk ? f.amount : "undisclosed", description: guardClaims(f.description, src), url: src.url, _key: src.url };
+        const clean = v => (/^(undisclosed|unknown|n\/a|none)$/i.test(String(v || "").trim()) ? "" : v);
+        return { ...f, named, stage: clean(f.stage), investors: clean(f.investors), amount: amountOk ? f.amount : "undisclosed", description: guardClaims(f.description, src), url: src.url, _key: src.url };
       })
       
       .filter(f => !looksIncomplete(f.description))
