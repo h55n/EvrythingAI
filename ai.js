@@ -122,6 +122,16 @@ function goodText(v, min) {
   return typeof v === "string" && v.trim().length >= min && !PLACEHOLDER.test(v.trim());
 }
 
+export function looksIncomplete(t) {
+  const s = String(t || "").trim();
+  if (!s) return true;
+  if (/\b(a|an|the|of|with|for)\s+[\u2010-\u2015-]/i.test(s) || /(^|\s)[\u2010-\u2015-]\w/.test(s)) return true; // gap where a number was
+  if (/\b(on|for|a|an|the|and|or|with|to|of|in|that|which|by|from)$/i.test(s.replace(/[.!?]+$/, ""))) return true; // trailing stopword
+  if ((s.match(/\(/g) || []).length !== (s.match(/\)/g) || []).length) return true;
+  if (/\s{2,}|\.\.\.$|…$/.test(s)) return true;
+  return false;
+}
+
 function validatePipelineResult(r) {
   if (!r || typeof r !== "object") return "not a JSON object";
   const news = r.news?.items;
@@ -134,6 +144,8 @@ function validatePipelineResult(r) {
   for (const t of tools) {
     if (!goodText(t.name, 2) || !goodText(t.description, 15) || !goodText(t.useCase, 15)) return "tool item incomplete";
   }
+  for (const n of news) if (looksIncomplete(n.summary) || looksIncomplete(n.headline)) return "news text looks truncated";
+  for (const t of tools) if (looksIncomplete(t.description) || looksIncomplete(t.useCase)) return "tool text looks truncated";
   const bullets = r.signal?.bullets;
   if (!Array.isArray(bullets) || bullets.length < 3 || !bullets.every(b => goodText(b, 30))) return "signal incomplete";
   if (r.funding?.items && !Array.isArray(r.funding.items)) return "funding malformed";
@@ -390,6 +402,8 @@ Return ONLY valid JSON, no backticks:
         const amountOk = !f.amount || /undisclosed|unknown/i.test(f.amount) || isGrounded(f.amount, text);
         return { ...f, named, amount: amountOk ? f.amount : "undisclosed", description: guardClaims(f.description, src), url: src.url, _key: src.url };
       })
+      
+      .filter(f => !looksIncomplete(f.description))
       .filter(f => f.named && ((f.amount && !/undisclosed|unknown/i.test(f.amount)) || (f.stage && !/undisclosed|unknown/i.test(f.stage))));
     if (items.length) return { items, pool };
     console.warn("  ⚠️  Funding pick unusable, using headline fallback");
@@ -423,7 +437,7 @@ Return ONLY valid JSON, no backticks:
   try {
     const parsed = safeJSON(await chat(prompt, "mistral-large-latest", 600), null);
     const src = fresh[parsed?.index];
-    if (src && goodText(parsed.tagline, 15) && goodText(parsed.why, 15)) {
+    if (src && goodText(parsed.tagline, 15) && goodText(parsed.why, 15) && !looksIncomplete(parsed.tagline) && !looksIncomplete(parsed.why)) {
       pick = { name: goodText(parsed.name, 2) ? parsed.name : src.title, description: parsed.tagline, useCase: parsed.why, category: parsed.category || "", url: src.url, type: "daily", _key: src.url };
     }
   } catch (err) {
