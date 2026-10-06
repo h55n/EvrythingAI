@@ -565,6 +565,12 @@ Rules: each bullet is one full sentence of at least 12 words. Name only companie
       console.warn("  ⚠️  Final signal attempt failed:", err.message);
     }
   }
-  console.warn("  ⚠️  Final signal fell back to the pipeline signal");
-  return fallback;
+  console.warn("  ⚠️  Final signal fell back to plain bullets built from the items");
+  const f = funding?.items?.[0], n = news?.items?.[0], t = tools?.items?.[0], n2 = news?.items?.[1];
+  const bullets = [
+    f ? `${f.company} announced ${f.amount === "undisclosed" ? "a round" : f.amount}, one of the clearest deals in today's feeds.` : `Most attention today is on ${n ? n.headline : "the lead story"}.`,
+    t ? `Worth trying today: ${t.name}. ${String(t.description || "").replace(/[.]+$/, "")}.` : "Pick one small tool from today's list and test it on a real task.",
+    n2 ? `Keep an eye on this story, it may change what you build next: ${n2.headline}.` : "Check the lead story before building on assumptions that may have changed.",
+  ];
+  return { bullets };
 }
