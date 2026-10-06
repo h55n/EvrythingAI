@@ -4,7 +4,7 @@ import { readFileSync, appendFileSync, mkdirSync, writeFileSync } from "fs";
 import { Resend } from "resend";
 import { collectNews, collectFunding, collectTools, collectToolPool } from "./sources.js";
 import { loadSeen, isSeen, filterUnseen, remember, saveSeen } from "./seen.js";
-import { runPipeline, appendDailyTool, pickFunding, generateMonthlyWrap } from "./ai.js";
+import { runPipeline, appendDailyTool, generateFinalSignal, pickFunding, generateMonthlyWrap } from "./ai.js";
 import { buildEmailHTML, buildEmailText, buildMonthlyHTML, buildMonthlyText } from "./email.js";
 
 // ── Pipeline monitor (local only — gitignored) ─────────────────
@@ -238,7 +238,8 @@ async function runDaily(resend, subscribers) {
   const tools = await appendDailyTool(toolsNoDup, poolFresh, seen, isSeen);
   const fundingFinal = { items: fundingPick.items };
 
-  const payload = { news, tools, funding: fundingFinal, signal, date };
+  const signalFinal = await generateFinalSignal(news, tools, fundingFinal, signal);
+  const payload = { news, tools, funding: fundingFinal, signal: signalFinal, date };
   const html = buildEmailHTML(payload);
   const text = buildEmailText(payload);
   const subject = `EvrythingAI — ${date}`;
@@ -273,7 +274,7 @@ async function runDaily(resend, subscribers) {
   (fundingFinal?.items || []).forEach(item => console.log(`    • ${item.company}${item.amount ? ` (${item.amount})` : ""}`));
   console.log("\n📡  SIGNAL:");
   const sLabels = ["💰", "🔨", "⚠️"];
-  (signal?.bullets || []).forEach((b, i) => console.log(`    ${sLabels[i] || "•"} ${b}`));
+  (signalFinal?.bullets || []).forEach((b, i) => console.log(`    ${sLabels[i] || "•"} ${b}`));
   console.log("\n────────────────────────────────────────────────────────\n");
 }
 

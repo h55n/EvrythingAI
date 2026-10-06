@@ -389,7 +389,7 @@ export async function pickFunding(rawFunding, rawNews, seen = {}, isSeenFn = () 
   const pool = [...rawFunding, ...rawNews].filter(i => DEAL_RE.test(`${i.title} ${i.summary}`) && !AGG_RE.test(i.title) && !isSeenFn(seen, i.url, i.title)).slice(0, 25);
   if (pool.length === 0) return { items: [], pool };
   console.log(`  AI: picking funding and deals from ${pool.length} candidates...`);
-  const prompt = `Below are recent headlines that mention funding rounds or deals. Pick up to 3 that are each about ONE named company raising money or being acquired, relevant to AI and tech builders and investors. Skip market summaries, quarterly or global statistics, rankings and reports. Use only facts stated in the text. If the amount, stage or investor is not stated, write "undisclosed".
+  const prompt = `Below are recent headlines that mention funding rounds or deals. Pick up to 3 that are each about ONE named company that RAISED a stated amount of money or was acquired, relevant to AI and tech builders and investors. Skip market summaries, quarterly or global statistics, rankings and reports. Use only facts stated in the text. "amount" is the money RAISED, never a valuation. If the text gives only a valuation, offers or talks (not a completed raise), skip that item. If the stage or investor is not stated, write "undisclosed". Investors must be copied in full from the text.
 
 ${pool.map((i, n) => `[${n}] ${i.title} (${i.source})\n${i.summary}`).join("\n\n")}
 
@@ -407,11 +407,18 @@ Return ONLY valid JSON, no backticks:
         const text = `${src.title} ${src.summary}`;
         const named = text.toLowerCase().includes(String(f.company).toLowerCase().split(/\s+/)[0]);
         const amountOk = !f.amount || /undisclosed|unknown/i.test(f.amount) || isGrounded(f.amount, text);
+        const amt = String(f.amount || "");
+        const amtNum = amt.replace(/[^0-9a-z.$€£]/gi, "").toLowerCase();
+        const valuationOnly = /valuation|valued at|worth/i.test(text) && !/\b(rais(e|es|ed|ing)|secur(e|es|ed)|closes?|closed|lands?|bags?|funding round|series [a-e]|seed)\b/i.test(text);
+        const talks = /\b(offers?|in talks|talks to|sources say|reportedly|fielding|considering)\b/i.test(src.title);
+        const inv = String(f.investors || "").trim();
+        const invOk = inv && !looksIncomplete(inv) && text.toLowerCase().includes(inv.toLowerCase().split(/[,&]| and /)[0].trim().slice(0, 14));
         const clean = v => (/^(undisclosed|unknown|n\/a|none)$/i.test(String(v || "").trim()) ? "" : v);
-        return { ...f, named, stage: clean(f.stage), investors: clean(f.investors), amount: amountOk ? f.amount : "undisclosed", description: guardClaims(f.description, src), url: src.url, _key: src.url };
+        return { ...f, named, valuationOnly, talks, stage: clean(f.stage), investors: invOk ? clean(f.investors) : "", amount: amountOk ? f.amount : "undisclosed", description: guardClaims(f.description, src), url: src.url, _key: src.url };
       })
       
       .filter(f => !looksIncomplete(f.description))
+      .filter(f => !f.valuationOnly && !f.talks)
       .filter(f => f.named && ((f.amount && !/undisclosed|unknown/i.test(f.amount)) || (f.stage && !/undisclosed|unknown/i.test(f.stage))));
     const fresh = items.filter(f => { const c = String(f.company).toLowerCase().trim(); const first = c.split(/\s+/)[0]; return !isSeenFn(seen, "co:" + c) && !isSeenFn(seen, c) && !(first.length > 3 && (isSeenFn(seen, "co:" + first) || isSeenFn(seen, first))); });
     if (fresh.length) return { items: fresh, pool };
@@ -419,16 +426,8 @@ Return ONLY valid JSON, no backticks:
   } catch (err) {
     console.warn("  ⚠️  Funding pick failed, using headline fallback:", err.message);
   }
-  const items = pool.slice(0, 3).map(i => ({
-    company: i.title.replace(/\s+[-–|].*$/, "").slice(0, 80),
-    amount: (i.title.match(/\$\s?\d+(\.\d+)?\s?(M|B|million|billion)/i) || ["undisclosed"])[0],
-    stage: "",
-    investors: "",
-    description: i.summary || i.title,
-    url: i.url,
-    _key: i.url,
-  }));
-  return { items, pool };
+  // No grounded raise found: leave the section short rather than guess
+  return { items: [], pool };
 }
 
 // ── Daily useful tool — chosen from a real pool, never skipped ─
@@ -524,4 +523,40 @@ Return ONLY valid JSON, no markdown, no backticks:
       "An incumbent will make a major AI acquisition next month.",
     ],
   });
+}
+
+
+// ── Signal built from the final items only, so it cannot drift from the sources ─
+const DEAL_WORDS = /\b(acqui\w*|buyout|merger|merge[sd]?|ipo|go(es|ing)? public|takeover|bankrupt\w*|layoffs?|lawsuit|sued?)\b/gi;
+export async function generateFinalSignal(news, tools, funding, fallback) {
+  const lines = [
+    ...(news?.items || []).map(n => `NEWS: ${n.headline}. ${n.summary || ""}`),
+    ...(tools?.items || []).map(t => `TOOL: ${t.name}: ${t.description || ""}`),
+    ...(funding?.items || []).map(f => `FUNDING: ${f.company} raised ${f.amount}. ${f.description || ""}`),
+  ];
+  const source = lines.join("\n");
+  const prompt = `Write the "signal" for today's AI newsletter using ONLY the items below.
+
+${source}
+
+Return ONLY valid JSON, no backticks: {"bullets":["...","...","..."]}
+Exactly 3 bullets: (1) where capital is flowing (if there are no funding items, talk about where attention is going instead), (2) what builders should pursue, (3) a risk or crowded space to avoid.
+Rules: each bullet is one full sentence of at least 12 words. Name only companies and products listed above. Use only figures listed above. Do not turn offers, talks or valuations into raises, and never say acquisition, merger or IPO unless an item above says it.`;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const r = safeJSON(await chat(prompt, "mistral-large-latest", 700), null);
+      const b = r?.bullets;
+      if (!Array.isArray(b) || b.length !== 3) continue;
+      if (!b.every(x => goodText(x, 30) && !looksIncomplete(x) && !EXTREME_RE.test(x))) continue;
+      if (!b.every(x => isGrounded(x, source))) continue;
+      const srcLow = source.toLowerCase();
+      const badDeal = b.some(x => (x.match(DEAL_WORDS) || []).some(w => !srcLow.includes(w.toLowerCase().slice(0, 5))));
+      if (badDeal) continue;
+      return { bullets: b };
+    } catch (err) {
+      console.warn("  ⚠️  Final signal attempt failed:", err.message);
+    }
+  }
+  console.warn("  ⚠️  Final signal fell back to the pipeline signal");
+  return fallback;
 }
