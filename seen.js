@@ -2,7 +2,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from "fs";
 
 const FILE = new URL("./.seen/seen.json", import.meta.url);
-const KEEP_DAYS = 21;
+const KEEP_DAYS = 14;
 
 function norm(v) {
   return String(v || "").toLowerCase().replace(/^https?:\/\/(www\.)?/, "").replace(/[?#].*$/, "").replace(/\/+$/, "").trim();

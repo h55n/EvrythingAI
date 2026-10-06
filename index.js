@@ -201,7 +201,9 @@ async function runDaily(resend, subscribers) {
     collectToolPool().catch(err => { console.warn("  [warn] tool pool failed:", err.message); return []; }),
   ]);
   const rawNews = filterUnseen(seen, allNews);
-  const rawTools = filterUnseen(seen, allTools);
+  // mix real builder projects (GitHub, Hugging Face) in with Product Hunt / Show HN so the list is not one source
+  const mixedTools = [...allTools.filter(t => !/producthunt/i.test(t.source || t.url || "")).slice(0, 15), ...toolPool.slice(0, 20), ...allTools.filter(t => /producthunt/i.test(t.source || t.url || "")).slice(0, 8)];
+  const rawTools = filterUnseen(seen, mixedTools);
   console.log(`     Got ${allNews.length} news (${rawNews.length} unseen), ${rawFunding.length} funding, ${allTools.length} tools (${rawTools.length} unseen), ${toolPool.length} pool\n`);
 
   if (rawNews.length < 3) {
@@ -259,7 +261,7 @@ async function runDaily(resend, subscribers) {
   for (const n of news?.items || []) remember(seen, n.url, n.headline);
   for (const t of tools?.items || []) remember(seen, t.url, t.name);
   for (const f of fundingFinal.items) remember(seen, f._key, f.company);
-  if (!process.env.TEST_RECIPIENT) saveSeen(seen);
+  saveSeen(seen);
 
   // Preview
   console.log("\n── CONTENT PREVIEW ─────────────────────────────────────\n");
