@@ -413,7 +413,8 @@ Return ONLY valid JSON, no backticks:
       
       .filter(f => !looksIncomplete(f.description))
       .filter(f => f.named && ((f.amount && !/undisclosed|unknown/i.test(f.amount)) || (f.stage && !/undisclosed|unknown/i.test(f.stage))));
-    if (items.length) return { items, pool };
+    const fresh = items.filter(f => { const c = String(f.company).toLowerCase().trim(); const first = c.split(/\s+/)[0]; return !isSeenFn(seen, "co:" + c) && !isSeenFn(seen, c) && !(first.length > 3 && (isSeenFn(seen, "co:" + first) || isSeenFn(seen, first))); });
+    if (fresh.length) return { items: fresh, pool };
     console.warn("  ⚠️  Funding pick unusable, using headline fallback");
   } catch (err) {
     console.warn("  ⚠️  Funding pick failed, using headline fallback:", err.message);

@@ -260,7 +260,7 @@ async function runDaily(resend, subscribers) {
   // Remember what went out so tomorrow's issue is different
   for (const n of news?.items || []) remember(seen, n.url, n.headline);
   for (const t of tools?.items || []) remember(seen, t.url, t.name);
-  for (const f of fundingFinal.items) remember(seen, f._key, f.company);
+  for (const f of fundingFinal.items) { remember(seen, f._key, f.company); const c = String(f.company).toLowerCase().trim(); remember(seen, "co:" + c, "co:" + c.split(/\s+/)[0]); }
   saveSeen(seen);
 
   // Preview
