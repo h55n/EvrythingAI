@@ -144,11 +144,10 @@ function validatePipelineResult(r) {
   }
   const tools = r.tools?.items;
   if (!Array.isArray(tools) || tools.length < 1) return "no tools";
-  for (const t of tools) {
-    if (!goodText(t.name, 2) || !goodText(t.description, 15) || !goodText(t.useCase, 15)) return "tool item incomplete";
-  }
+  // drop bad tool entries instead of rejecting the whole run; keep going if at least one is good
+  r.tools.items = tools.filter(t => goodText(t.name, 2) && goodText(t.description, 15) && goodText(t.useCase, 15) && !looksIncomplete(t.description) && !looksIncomplete(t.useCase));
+  if (r.tools.items.length < 1) return "tool text looks truncated";
   for (const n of news) if (looksIncomplete(n.summary) || looksIncomplete(n.headline)) return "news text looks truncated";
-  for (const t of tools) if (looksIncomplete(t.description) || looksIncomplete(t.useCase)) return "tool text looks truncated";
   const bullets = r.signal?.bullets;
   if (!Array.isArray(bullets) || bullets.length < 3 || !bullets.every(b => goodText(b, 30))) return "signal incomplete";
   if (r.funding?.items && !Array.isArray(r.funding.items)) return "funding malformed";
