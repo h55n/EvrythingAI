@@ -184,7 +184,7 @@ export function buildEmailHTML(input) {
 
   const fundItems = funding?.items || [];
   const fundHTML = fundItems.length ? `
-    ${sectionHead("Funding &amp; deals")}
+    ${sectionHead(fundItems.some(f => f.recap) ? "Funding &amp; deals &middot; quiet day, from the last few days" : "Funding &amp; deals")}
     <tr><td>${card(fundItems.map((f, i) => `
       <div style="padding:${i === 0 ? "0" : "14px"} 0 ${i === fundItems.length - 1 ? "0" : "14px"} 0;${i < fundItems.length - 1 ? `border-bottom:1px solid ${P.oliveDeep};` : ""}">
         <div style="font-family:${SERIF};font-size:20px;font-weight:700;color:${P.forest};">${f.company || ""}${f.amount ? `&nbsp; ${tag(f.amount, P.gold)}` : ""}${f.stage ? `&nbsp; ${tag(f.stage, P.paper, P.muted)}` : ""}</div>
@@ -286,6 +286,7 @@ export function buildEmailText({ news, tools, funding, signal, date }) {
     lines.push("");
   }
   lines.push("▸ FUNDING & DEALS", "-".repeat(30));
+  if ((funding?.items || []).some(f => f.recap)) lines.push("  (Quiet day - recent deals from the last few days)");
   (funding?.items || []).forEach(item => {
     lines.push(`${item.company}${item.amount ? ` — ${item.amount}` : ""}${item.stage ? ` (${item.stage})` : ""}`);
     lines.push(`  ${item.description}`);

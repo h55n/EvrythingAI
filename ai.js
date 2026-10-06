@@ -385,6 +385,15 @@ Rules:
 const DEAL_RE = /\b(raises?|raised|raising|funding|series [a-e]|seed round|seed|valuation|acquires?|acquired|acquisition|invests?|backed|led by|\$\s?\d+(\.\d+)?\s?(m|b|million|billion))\b/i;
 
 export async function pickFunding(rawFunding, rawNews, seen = {}, isSeenFn = () => false) {
+  const first = await pickFundingPass(rawFunding, rawNews, seen, isSeenFn);
+  if (first.items.length) return first;
+  // Quiet day: fall back to the most recent real deals from the last few days, clearly labelled
+  console.warn("  ⚠️  No fresh deals today, using a labelled recap of recent ones");
+  const second = await pickFundingPass(rawFunding, rawNews, {}, () => false);
+  return { items: second.items.slice(0, 2).map(f => ({ ...f, recap: true })), pool: second.pool, recap: true };
+}
+
+async function pickFundingPass(rawFunding, rawNews, seen = {}, isSeenFn = () => false) {
   const AGG_RE = /\b(global|quarter|Q[1-4]|report|index|ranking|statistics|trends?|billion in funding|so far this year|weekly|monthly|recap|roundup)\b/i;
   const pool = [...rawFunding, ...rawNews].filter(i => DEAL_RE.test(`${i.title} ${i.summary}`) && !AGG_RE.test(i.title) && !isSeenFn(seen, i.url, i.title)).slice(0, 25);
   if (pool.length === 0) return { items: [], pool };

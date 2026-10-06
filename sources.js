@@ -37,6 +37,10 @@ const FUNDING_FEEDS = [
   { name: "TechCrunch Venture",  url: "https://techcrunch.com/category/venture/feed/" },
   { name: "FinSMEs",             url: "https://www.finsmes.com/feed" },
   { name: "Tech.eu",             url: "https://tech.eu/feed/" },
+  { name: "EU-Startups",         url: "https://www.eu-startups.com/feed/" },
+  { name: "AlleyWatch",          url: "https://www.alleywatch.com/feed/" },
+  { name: "TechCrunch Funding",  url: "https://techcrunch.com/tag/funding/feed/" },
+  { name: "Sifted",              url: "https://sifted.eu/feed" },
   { name: "SiliconANGLE",        url: "https://siliconangle.com/category/ai/feed/" },
 ];
 
