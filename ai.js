@@ -540,7 +540,7 @@ export async function generateFinalSignal(news, tools, funding, fallback) {
 ${source}
 
 Return ONLY valid JSON, no backticks: {"bullets":["...","...","..."]}
-Exactly 3 bullets: (1) where capital is flowing (if there are no funding items, talk about where attention is going instead), (2) what builders should pursue, (3) a risk or crowded space to avoid.
+Exactly 3 bullets: (1) ${(funding?.items || []).length ? "where capital is flowing, based only on the FUNDING items" : "where developer attention is going today, based on the NEWS and TOOL items; do not mention capital, investment or funding"}, (2) what builders should pursue, (3) a risk or crowded space to avoid.
 Rules: each bullet is one full sentence of at least 12 words. Name only companies and products listed above. Use only figures listed above. Do not turn offers, talks or valuations into raises, and never say acquisition, merger or IPO unless an item above says it.`;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
