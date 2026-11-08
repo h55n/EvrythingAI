@@ -1,11 +1,12 @@
 {
   "name": "evrythingai",
   "version": "1.0.0",
-  "description": "Automated daily AI & tech newsletter — news, tools, funding, and a sharp investor/builder signal. Delivered to your inbox every morning via Mistral + Resend.",
+  "description": "Automated daily AI & tech newsletter \u2014 news, tools, funding, and a sharp investor/builder signal. Delivered to your inbox every morning via Mistral + Resend.",
   "main": "index.js",
   "scripts": {
     "start": "node index.js --force",
-    "send": "node index.js --force"
+    "send": "node index.js --force",
+    "test": "node --test"
   },
   "keywords": [],
   "author": "",

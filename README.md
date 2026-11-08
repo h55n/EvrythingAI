@@ -266,3 +266,10 @@ Store the full JSON array in the repository secret `SUBSCRIBERS_JSON`. When subs
 | Mistral API | Free tier |
 | Resend | Free (3,000 emails/month) |
 | **Total** | **$0/month** |
+
+### Offline tests
+
+`npm test` exercises subscriber-list updates in fresh temporary directories.
+It does not run the newsletter pipeline, call a model or send email. The
+subscriber CLI refuses to overwrite malformed or invalid existing lists;
+only a genuinely missing file starts an empty list.
