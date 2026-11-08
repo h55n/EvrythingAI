@@ -31,18 +31,19 @@ let subscribers = [];
 try {
   const raw = readFileSync(SUBS_PATH, "utf-8");
   const parsed = JSON.parse(raw);
-  if (!Array.isArray(parsed)) {
-    console.warn("⚠️  subscribers.json was not an array — resetting");
-    subscribers = [];
-  } else {
-    subscribers = parsed.map(entry => {
-      if (typeof entry === "string") return { email: entry };
-      if (entry && typeof entry === "object" && entry.email) return { email: entry.email };
-      return null;
-    }).filter(Boolean);
+  if (!Array.isArray(parsed)) throw new Error("expected a JSON array");
+  subscribers = parsed.map(entry => {
+    const address = typeof entry === "string" ? entry : entry?.email;
+    if (typeof address !== "string" || !EMAIL_REGEX.test(address)) {
+      throw new Error("subscriber list contains an invalid email record");
+    }
+    return { email: address };
+  });
+} catch (err) {
+  if (err.code !== "ENOENT") {
+    console.error("Cannot update subscribers.json safely:", err.message);
+    process.exit(1);
   }
-} catch {
-  subscribers = [];
 }
 
 // ── Check for duplicates ────────────────────────────────────────
