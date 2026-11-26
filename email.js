@@ -253,6 +253,7 @@ export function buildEmailHTML(input) {
         <tr><td style="padding:36px 0 0 0;">
           ${stitchRow(P.cream, 22)}
           <div style="font-family:${MONO};font-size:10px;letter-spacing:2px;text-transform:uppercase;color:${P.cream};padding-top:12px;line-height:1.8;">EvrythingAI &middot; built by h55n &middot; ${date}</div>
+          ${process.env.UNSUBSCRIBE_URL ? `<div style="font-family:${MONO};font-size:10px;letter-spacing:2px;text-transform:uppercase;padding-top:6px;line-height:1.8;"><a href="${process.env.UNSUBSCRIBE_URL}" style="color:${P.cream};">Unsubscribe</a></div>` : ""}
         </td></tr>
       </table>
     </td></tr>
