@@ -101,6 +101,15 @@ function headerBlock(subtitle, date) {
 }
 
 function footerBlock(date) {
+  const unsubscribeUrl = process.env.UNSUBSCRIBE_URL || "";
+  const unsubscribeRow = unsubscribeUrl
+    ? `
+                <tr>
+                  <td style="padding-top:10px;text-align:center;">
+                    <a href="${unsubscribeUrl}" style="font-family:'DM Mono','Courier New',monospace;font-size:9px;color:#B79B68;letter-spacing:2px;text-transform:uppercase;">Unsubscribe</a>
+                  </td>
+                </tr>`
+    : "";
   return `
           <tr>
             <td style="padding:36px 32px 20px 32px;">
@@ -109,7 +118,7 @@ function footerBlock(date) {
                   <td class="divider" style="border-top:1px solid rgba(183,155,104,0.35);padding-top:20px;">
                     <p class="muted-text" style="font-family:'DM Mono','Courier New',monospace;font-size:9px;color:#B79B68;text-align:center;letter-spacing:2px;margin:0;text-transform:uppercase;">EvrythingAI &nbsp;·&nbsp; Built by Hssn &nbsp;·&nbsp; AI-curated daily brief &nbsp;·&nbsp; ${date}</p>
                   </td>
-                </tr>
+                </tr>${unsubscribeRow}
               </table>
             </td>
           </tr>`;
@@ -301,6 +310,7 @@ export function buildEmailText({ news, tools, funding, signal, date }) {
   });
   lines.push("", "=".repeat(50));
   lines.push("EvrythingAI · Built by Hssn · AI-curated daily brief");
+  if (process.env.UNSUBSCRIBE_URL) lines.push(`Unsubscribe: ${process.env.UNSUBSCRIBE_URL}`);
   return lines.join("\n");
 }
 
