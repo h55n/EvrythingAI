@@ -9,6 +9,10 @@ on:
         description: 'Send only to this address (for testing)'
         required: false
         default: ''
+      dry_run:
+        description: 'Build the issue and list recipients without sending (true/false)'
+        required: false
+        default: ''
 
 concurrency:
   group: newsletter
@@ -80,8 +84,12 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GITHUB_TOKEN: ${{ github.token }}
           TEST_RECIPIENT: ${{ github.event.inputs.test_recipient }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           FROM_EMAIL: ${{ secrets.FROM_EMAIL }}
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          BREVO_LIST_ID: '4'
+          UNSUBSCRIBE_URL: 'https://d94c853a.sibforms.com/serve/MUIFAKiRkQP_MxV4zvTE6l5m92gC2GoD-vzuNRofk75aUR8niC7xToK08OXDUBz_xGatK_-UjRMUn81evPC1-VSJewWsGdziJ9YzvaJ786HRSnwKhIzmM1E0QKcBE6vd9XzVrhmu8OKRutgpE1CuITG694_naQIzsNF_GSGo6KMstW9C9U7Ig9lUcefOlkzEbMGbYLBfBnUOFtPoFw=='
         run: |
           for attempt in 1 2; do
             if node index.js --force; then exit 0; fi
@@ -91,7 +99,7 @@ jobs:
           exit 1
 
       - name: Upload sent test issue
-        if: always() && github.event.inputs.test_recipient != ''
+        if: always() && (github.event.inputs.test_recipient != '' || github.event.inputs.dry_run != '')
         uses: actions/upload-artifact@v4
         with:
           name: test-issue

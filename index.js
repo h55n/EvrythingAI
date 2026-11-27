@@ -96,6 +96,38 @@ function loadAllSubscribers() {
   return valid;
 }
 
+// ── Brevo subscriber loading (primary source; subscribers.json is fallback) ──
+async function loadBrevoSubscribers() {
+  const apiKey = process.env.BREVO_API_KEY;
+  const listId = process.env.BREVO_LIST_ID;
+  if (!apiKey || !listId) return null;
+
+  const emails = [];
+  const limit = 50;
+  let offset = 0;
+  try {
+    while (true) {
+      const res = await fetch(`https://api.brevo.com/v3/contacts/lists/${listId}/contacts?limit=${limit}&offset=${offset}`, {
+        headers: { "api-key": apiKey, "accept": "application/json" },
+      });
+      if (!res.ok) throw new Error(`Brevo API responded ${res.status}`);
+      const data = await res.json();
+      const contacts = Array.isArray(data.contacts) ? data.contacts : [];
+      for (const c of contacts) {
+        if (c && typeof c.email === "string" && c.email.includes("@") && !c.emailBlacklisted) {
+          emails.push({ email: c.email });
+        }
+      }
+      if (contacts.length < limit) break;
+      offset += limit;
+    }
+    return emails;
+  } catch (err) {
+    console.warn("⚠️  Could not load subscribers from Brevo:", err.message);
+    return null;
+  }
+}
+
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -152,6 +184,12 @@ const AI_CALLS_PREVIOUS_TOTAL = 5;
 
 // ── Send emails with per-subscriber error handling ──────────────
 async function sendToSubscribers(resend, subscribers, subject, html, text) {
+  if (process.env.DRY_RUN) {
+    console.log(`\n🧪  DRY_RUN enabled - skipping all sends. Would send to ${subscribers.length} subscriber(s):`);
+    subscribers.forEach(s => console.log(`    • ${s.email}`));
+    return { successCount: subscribers.length, failCount: 0 };
+  }
+
   console.log(`\n📧  Sending to ${subscribers.length} subscriber(s) via Resend...`);
 
   let successCount = 0;
@@ -243,7 +281,7 @@ async function runDaily(resend, subscribers) {
   const html = buildEmailHTML(payload);
   const text = buildEmailText(payload);
   const subject = `EvrythingAI — ${date}`;
-  if (process.env.TEST_RECIPIENT) { mkdirSync("out", { recursive: true }); writeFileSync("out/issue.html", html); }
+  if (process.env.TEST_RECIPIENT || process.env.DRY_RUN) { mkdirSync("out", { recursive: true }); writeFileSync("out/issue.html", html); }
 
   const { successCount, failCount } = await sendToSubscribers(resend, subscribers, subject, html, text);
 
@@ -345,10 +383,22 @@ async function run() {
   validateEnv();
   const resend = new Resend(process.env.RESEND_API_KEY);
 
-  const subscribers = loadAllSubscribers();
+  let subscribers = loadAllSubscribers();
+
+  if (!process.env.TEST_RECIPIENT) {
+    const brevoSubscribers = await loadBrevoSubscribers();
+    if (brevoSubscribers && brevoSubscribers.length > 0) {
+      console.log(`📋  Loaded ${brevoSubscribers.length} subscriber(s) from Brevo list ${process.env.BREVO_LIST_ID}`);
+      subscribers = brevoSubscribers;
+    } else if (brevoSubscribers) {
+      console.warn("⚠️  Brevo list returned 0 subscribers; falling back to subscribers.json");
+    } else {
+      console.warn("⚠️  Using subscribers.json fallback");
+    }
+  }
 
   if (subscribers.length === 0) {
-    console.error("❌  No valid subscribers found in subscribers.json");
+    console.error("❌  No valid subscribers found (subscribers.json and Brevo)");
     process.exit(1);
   }
 
