@@ -35,13 +35,14 @@ const FUNDING_FEEDS = [
   { name: "TechCrunch Startups", url: "https://techcrunch.com/category/startups/feed/" },
   { name: "Crunchbase News",     url: "https://news.crunchbase.com/feed/" },
   { name: "TechCrunch Venture",  url: "https://techcrunch.com/category/venture/feed/" },
-  { name: "FinSMEs",             url: "https://www.finsmes.com/feed" },
-  { name: "Tech.eu",             url: "https://tech.eu/feed/" },
-  { name: "EU-Startups",         url: "https://www.eu-startups.com/feed/" },
-  { name: "AlleyWatch",          url: "https://www.alleywatch.com/feed/" },
-  { name: "TechCrunch Funding",  url: "https://techcrunch.com/tag/funding/feed/" },
   { name: "Sifted",              url: "https://sifted.eu/feed" },
   { name: "SiliconANGLE",        url: "https://siliconangle.com/category/ai/feed/" },
+  { name: "Inc42",               url: "https://inc42.com/feed/" },
+  { name: "BetaKit",             url: "https://betakit.com/feed/" },
+  { name: "The SaaS News",       url: "https://www.thesaasnews.com/feed" },
+  { name: "Tech Funding News",   url: "https://techfundingnews.com/feed/" },
+  { name: "TechCabal",           url: "https://techcabal.com/feed/" },
+  { name: "YourStory",           url: "https://yourstory.com/feed" },
 ];
 
 const TOOL_FEEDS = [
