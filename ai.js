@@ -399,7 +399,7 @@ export async function pickFunding(rawFunding, rawNews, seen = {}, isSeenFn = () 
   const items = pool.map(headlineFallbackItem).filter(Boolean).slice(0, 2);
   if (items.length) console.warn(`  ⚠️  AI pick empty; listing ${items.length} real deal headline(s) verbatim instead`);
   else console.warn("  ⚠️  No deal headlines in today's feeds at all; section will be omitted");
-  return { items, pool, recap: true };
+  return { items, pool, recap: true, verbatim: true };
 }
 
 // Verbatim rendering of a feed item as a funding entry: company, amount and
@@ -408,8 +408,8 @@ function headlineFallbackItem(src) {
   const title = String(src.title || "").trim();
   if (!title) return null;
   const text = `${title} ${src.summary || ""}`;
-  const verb = title.match(/^\s*(.{2,60}?)\s+(?:raises?\b|raised\b|lands?\b|secures?\b|secured\b|closes?\b|closed\b|bags?\b|nabs?\b|gets?\b|snags?\b|acquires?\b|is acquired\b|announces\b)/i);
-  const company = (verb ? verb[1] : title.split(/[—–|:-]/)[0]).trim().slice(0, 60);
+  const verb = title.match(/^\s*(.{2,60}?)\s+(?:raises?\b|raised\b|lands?\b|landed\b|secures?\b|secured\b|closes?\b|closed\b|bags?\b|bagged\b|nabs?\b|nabbed\b|gets?\b|got\b|snags?\b|snagged\b|acquires?\b|is acquired\b|announces\b)/i);
+  const company = (verb ? verb[1] : title.split(/[—–|:-]/)[0]).replace(/(\s+(?:just|has|have|its|their|the|a|an))+$/, "").trim().slice(0, 60);
   if (company.length < 2) return null;
   const amount = (text.match(/[$€£]\s?\d+(?:[.,]\d+)?\s?(?:m|b|mn|bn|million|billion)\b/i) || [""])[0].replace(/\s+/g, " ").trim();
   const stage = (text.match(/\b(pre-seed|seed|series\s?[a-f]|growth round|debt financing)\b/i) || [""])[0];

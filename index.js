@@ -276,7 +276,9 @@ async function runDaily(resend, subscribers) {
   const tools = await appendDailyTool(toolsNoDup, poolFresh, seen, isSeen);
   const fundingFinal = { items: fundingPick.items };
 
-  const signalFinal = await generateFinalSignal(news, tools, fundingFinal, signal);
+  // Verbatim headline fallbacks are quiet-day filler, not confirmed raises:
+  // keep them out of the Signal so its capital bullet stays as it is today.
+  const signalFinal = await generateFinalSignal(news, tools, fundingPick.verbatim ? { items: [] } : fundingFinal, signal);
   const payload = { news, tools, funding: fundingFinal, signal: signalFinal, date };
   const html = buildEmailHTML(payload);
   const text = buildEmailText(payload);
