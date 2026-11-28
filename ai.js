@@ -389,7 +389,40 @@ export async function pickFunding(rawFunding, rawNews, seen = {}, isSeenFn = () 
   // Quiet day: fall back to the most recent real deals from the last few days, clearly labelled
   console.warn("  ⚠️  No fresh deals today, using a labelled recap of recent ones");
   const second = await pickFundingPass(rawFunding, rawNews, {}, () => false);
-  return { items: second.items.slice(0, 2).map(f => ({ ...f, recap: true })), pool: second.pool, recap: true };
+  if (second.items.length) {
+    return { items: second.items.slice(0, 2).map(f => ({ ...f, recap: true })), pool: second.pool, recap: true };
+  }
+  // Last resort: the AI pass rejected everything. List the pool's real deal
+  // headlines exactly as the feeds reported them, so the section never goes
+  // out empty. Nothing is generated: every field comes from the source text.
+  const pool = second.pool.length ? second.pool : first.pool;
+  const items = pool.map(headlineFallbackItem).filter(Boolean).slice(0, 2);
+  if (items.length) console.warn(`  ⚠️  AI pick empty; listing ${items.length} real deal headline(s) verbatim instead`);
+  else console.warn("  ⚠️  No deal headlines in today's feeds at all; section will be omitted");
+  return { items, pool, recap: true };
+}
+
+// Verbatim rendering of a feed item as a funding entry: company, amount and
+// stage are copied or extracted from the source text, never written by a model.
+function headlineFallbackItem(src) {
+  const title = String(src.title || "").trim();
+  if (!title) return null;
+  const text = `${title} ${src.summary || ""}`;
+  const verb = title.match(/^\s*(.{2,60}?)\s+(?:raises?\b|raised\b|lands?\b|secures?\b|secured\b|closes?\b|closed\b|bags?\b|nabs?\b|gets?\b|snags?\b|acquires?\b|is acquired\b|announces\b)/i);
+  const company = (verb ? verb[1] : title.split(/[—–|:-]/)[0]).trim().slice(0, 60);
+  if (company.length < 2) return null;
+  const amount = (text.match(/[$€£]\s?\d+(?:[.,]\d+)?\s?(?:m|b|mn|bn|million|billion)\b/i) || [""])[0].replace(/\s+/g, " ").trim();
+  const stage = (text.match(/\b(pre-seed|seed|series\s?[a-f]|growth round|debt financing)\b/i) || [""])[0];
+  return {
+    company,
+    amount,
+    stage: stage ? stage[0].toUpperCase() + stage.slice(1) : "",
+    investors: "",
+    description: String(src.summary || title).trim(),
+    url: src.url,
+    _key: src.url,
+    recap: true,
+  };
 }
 
 async function pickFundingPass(rawFunding, rawNews, seen = {}, isSeenFn = () => false) {
@@ -428,6 +461,7 @@ Return ONLY valid JSON, no backticks:
       .filter(f => !looksIncomplete(f.description))
       .filter(f => !f.valuationOnly && !f.talks)
       .filter(f => f.named && ((f.amount && !/undisclosed|unknown/i.test(f.amount)) || (f.stage && !/undisclosed|unknown/i.test(f.stage))));
+    console.log(`  AI: ${items.length} of ${(parsed?.items || []).length} funding pick(s) passed the grounding checks`);
     const fresh = items.filter(f => { const c = String(f.company).toLowerCase().trim(); const first = c.split(/\s+/)[0]; return !isSeenFn(seen, "co:" + c) && !isSeenFn(seen, c) && !(first.length > 3 && (isSeenFn(seen, "co:" + first) || isSeenFn(seen, first))); });
     if (fresh.length) return { items: fresh, pool };
     console.warn("  ⚠️  Funding pick unusable, using headline fallback");
